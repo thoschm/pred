@@ -140,9 +140,9 @@ struct Particle
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-#define PSO_MT
-//#define PSO_OMP
-#define THREADS 20u
+//#define PSO_MT
+#define PSO_OMP
+//#define THREADS 20u
 
 template <typename NumericalType, int Dim>
 class PSO
@@ -182,14 +182,15 @@ public:
         mParticles = new Particle<NumericalType, Dim>[particleCount];
 
 #ifdef PSO_MT
+        const uint threads = std::min(THREADS, particleCount);
         mArgs.dim = Dim;
-        mArgs.range = particleCount / THREADS;
+        mArgs.range = particleCount / threads;
         mArgs.partCnt = particleCount;
-        mArgs.threads = THREADS;
+        mArgs.threads = threads;
         mArgs.particles = mParticles;
         mArgs.function = scoreFunction;
         mArgs.payload = payload;
-        mPool.create(THREADS, worker, (void *)&mArgs);
+        mPool.create(threads, worker, (void *)&mArgs);
 #endif
     }
 
