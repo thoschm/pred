@@ -117,6 +117,7 @@ public:
     }
 
     // compute convolution error of input sequence
+    //TODO: select: minimize largest error
     static NumericalType convolution(const Kernel<NumericalType, Window, Nodes> &krnl,
                                      const std::vector<NumericalType> &data,
                                      const NumericalType targetValue,

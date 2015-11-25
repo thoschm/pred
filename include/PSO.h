@@ -29,7 +29,6 @@ namespace Predictor
 /////////////////////////////////
 // WORKER POOL
 /////////////////////////////////
-// TODO: prevent fast threads from waiting for slow threads, make a queue and let threads take chunks
 class WorkerPool
 {
     WorkerPool(const WorkerPool &other);
@@ -141,9 +140,9 @@ struct Particle
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-//#define PSO_MT
-#define PSO_OMP
-//#define THREADS 50u
+#define PSO_MT
+//#define PSO_OMP
+#define THREADS 20u
 
 template <typename NumericalType, int Dim>
 class PSO
