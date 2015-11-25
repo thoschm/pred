@@ -204,7 +204,7 @@ public:
         for (uint i = 0; i < Window * Nodes; ++i)
         {
             result.data[i].mu    = values[cnt++];
-            result.data[i].sigma = values[cnt++];
+            result.data[i].sigma = std::fabs(values[cnt++]) + pl.minSigma;
             result.data[i].scale = values[cnt++];
         }
 
@@ -230,14 +230,8 @@ public:
         for (uint i = 0; i < Window * Nodes; ++i)
         {
             krnl.data[i].mu    = values[cnt++];
-            krnl.data[i].sigma = values[cnt++];
-            krnl.data[i].scale = values[cnt++];
-
-            // reject if sigma too small
-            if (krnl.data[i].sigma < pl->minSigma)
-            {
-                return (NumericalType)FLT_MAX;
-            }
+            krnl.data[i].sigma = std::fabs(values[cnt++]) + pl->minSigma;
+            krnl.data[i].scale = values[cnt++];            
         }
 
         // compute cost
