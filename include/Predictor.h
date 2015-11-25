@@ -91,7 +91,7 @@ public:
                                   const NumericalType scale,
                                   const NumericalType value)
     {
-        NumericalType d = value - mu;
+        const NumericalType d = value - mu;
         //return scale * std::exp((NumericalType)-0.5 * d * d / (sigma * sigma));
         return scale / ((NumericalType)1.0 + sigma * d * d);
     }
