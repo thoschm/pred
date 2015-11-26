@@ -191,20 +191,22 @@ public:
             normalize(data, i, &vmin, &scale);
             // compute teacher and kernel response
             NumericalType teacher;
+            const NumericalType lastVal = scale * (data[i + Window - 1] - vmin),
+                                testVal = scale * (data[i + Window + ahead - 1] - vmin);
             if (TFunc == GAUSSIAN)
             {
-                teacher = gaussian(targetValue, targetSigma,
-                                  (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+                teacher = gaussian(lastVal + targetValue, targetSigma,
+                                  (NumericalType)1.0, testVal);
             }
             else if (TFunc == GAUSSIAN_UP_1)
             {
-                teacher = gaussian_up1(targetValue, targetSigma,
-                                      (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+                teacher = gaussian_up1(lastVal + targetValue, targetSigma,
+                                      (NumericalType)1.0, testVal);
             }
             else if (TFunc == GAUSSIAN_DOWN_1)
             {
-                teacher = gaussian_down1(targetValue, targetSigma,
-                                        (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+                teacher = gaussian_down1(lastVal + targetValue, targetSigma,
+                                        (NumericalType)1.0, testVal);
             }
             const NumericalType resp = response(krnl, data, i, vmin, scale);
             const NumericalType tmp = resp - teacher;
