@@ -108,7 +108,7 @@ public:
                                       const NumericalType scale,
                                       const NumericalType value)
     {
-        if (value > mu) return (NumericalType)1.0f;
+        if (value > mu) return (NumericalType)1.0;
         return gaussian(mu, sigma, scale, value);
     }
 
@@ -118,7 +118,7 @@ public:
                                         const NumericalType scale,
                                         const NumericalType value)
     {
-        if (value < mu) return (NumericalType)1.0f;
+        if (value < mu) return (NumericalType)1.0;
         return gaussian(mu, sigma, scale, value);
     }
 
