@@ -52,7 +52,7 @@ enum TeacherFunction
     GAUSSIAN_UP_1,
     GAUSSIAN_DOWN_1
 };
-template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc>
+template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc = GAUSSIAN>
 class KernelOperation
 {
     KernelOperation();
@@ -191,21 +191,20 @@ public:
             normalize(data, i, &vmin, &scale);
             // compute teacher and kernel response
             NumericalType teacher;
-            const NumericalType lastVal = scale * (data[i + Window - 1] - vmin),
-                                testVal = scale * (data[i + Window + ahead - 1] - vmin);
+            const NumericalType testVal = scale * (data[i + Window + ahead - 1] - vmin);
             if (TFunc == GAUSSIAN)
             {
-                teacher = gaussian(lastVal + targetValue, targetSigma,
+                teacher = gaussian(targetValue, targetSigma,
                                   (NumericalType)1.0, testVal);
             }
             else if (TFunc == GAUSSIAN_UP_1)
             {
-                teacher = gaussian_up1(lastVal + targetValue, targetSigma,
+                teacher = gaussian_up1(targetValue, targetSigma,
                                       (NumericalType)1.0, testVal);
             }
             else if (TFunc == GAUSSIAN_DOWN_1)
             {
-                teacher = gaussian_down1(lastVal + targetValue, targetSigma,
+                teacher = gaussian_down1(targetValue, targetSigma,
                                         (NumericalType)1.0, testVal);
             }
             const NumericalType resp = response(krnl, data, i, vmin, scale);
@@ -255,7 +254,7 @@ public:
 /////////////////////////////////
 // KERNEL MANAGER
 /////////////////////////////////
-template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc>
+template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc = GAUSSIAN>
 class KernelOptimizer
 {
     KernelOptimizer();
