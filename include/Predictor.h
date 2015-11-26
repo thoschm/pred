@@ -46,7 +46,13 @@ struct Kernel
 /////////////////////////////////
 // KERNEL MANAGER
 /////////////////////////////////
-template <typename NumericalType, int Window, int Nodes>
+enum TeacherFunction
+{
+    GAUSSIAN,
+    GAUSSIAN_UP_1,
+    GAUSSIAN_DOWN_1
+};
+template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc>
 class KernelOperation
 {
     KernelOperation();
@@ -94,6 +100,26 @@ public:
         const NumericalType d = value - mu;
         //return scale * std::exp((NumericalType)-0.5 * d * d / (sigma * sigma));
         return scale / ((NumericalType)1.0 + sigma * d * d);
+    }
+
+    // gaussian that is 1 above target
+    static NumericalType gaussian_up1(const NumericalType mu,
+                                      const NumericalType sigma,
+                                      const NumericalType scale,
+                                      const NumericalType value)
+    {
+        if (value > mu) return (NumericalType)1.0f;
+        return gaussian(mu, sigma, scale, value);
+    }
+
+    // gaussian that is 1 above target
+    static NumericalType gaussian_down1(const NumericalType mu,
+                                        const NumericalType sigma,
+                                        const NumericalType scale,
+                                        const NumericalType value)
+    {
+        if (value < mu) return (NumericalType)1.0f;
+        return gaussian(mu, sigma, scale, value);
     }
 
     // compute kernel response to an input vector
@@ -164,9 +190,23 @@ public:
             NumericalType vmin, scale;
             normalize(data, i, &vmin, &scale);
             // compute teacher and kernel response
-            const NumericalType teacher = gaussian(targetValue, targetSigma,
-                                          (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin)),
-                                resp    = response(krnl, data, i, vmin, scale);
+            NumericalType teacher;
+            if (TFunc == GAUSSIAN)
+            {
+                teacher = gaussian(targetValue, targetSigma,
+                                  (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+            }
+            else if (TFunc == GAUSSIAN_UP_1)
+            {
+                teacher = gaussian_up1(targetValue, targetSigma,
+                                      (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+            }
+            else if (TFunc == GAUSSIAN_DOWN_1)
+            {
+                teacher = gaussian_down1(targetValue, targetSigma,
+                                        (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin));
+            }
+            const NumericalType resp = response(krnl, data, i, vmin, scale);
             const NumericalType tmp = resp - teacher;
             error += tmp * tmp;
         }
@@ -213,7 +253,7 @@ public:
 /////////////////////////////////
 // KERNEL MANAGER
 /////////////////////////////////
-template <typename NumericalType, int Window, int Nodes>
+template <typename NumericalType, int Window, int Nodes, TeacherFunction TFunc>
 class KernelOptimizer
 {
     KernelOptimizer();
@@ -292,11 +332,11 @@ public:
         }
 
         // compute cost
-        return KernelOperation<NumericalType, Window, Nodes>::convolution(krnl,
-                                                                          *(pl->data),
-                                                                          pl->targetValue,
-                                                                          pl->targetSigma,
-                                                                          pl->targetAhead);
+        return KernelOperation<NumericalType, Window, Nodes, TFunc>::convolution(krnl,
+                                                                                *(pl->data),
+                                                                                pl->targetValue,
+                                                                                pl->targetSigma,
+                                                                                pl->targetAhead);
     }
 
 
