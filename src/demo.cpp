@@ -8,10 +8,10 @@
 using namespace Predictor;
 
 
-#define WINDOW 100
-#define NODES  2
+#define WINDOW 200
+#define NODES  5
 #define TARGET 1.0
-#define TSIGMA 10.0
+#define TSIGMA 1.0
 
 #define RAD(_a) ((_a) * M_PI / 180.0)
 
@@ -38,18 +38,31 @@ float scoreFunc(const float *array, const uint dim, const void *payload)
 
 int main(int argc, char **argv)
 {
-
-
+    std::ifstream ifs;
     std::vector<float> data, out, err;
+    
+    ifs.open("chart.txt", std::ios::in);
+    float value;
+    for ( ; ; )
+    {
+        ifs >> value;
+        if (ifs.eof())
+        {
+            break;
+        }
+        data.push_back(value);
+    }
+    ifs.close();    
+      
     std::ofstream ofs;
-    ofs.open("sine.txt");
+    /*ofs.open("sine.txt");
     for (uint i = 0; i < 1000u; ++i)
     {
         //data.push_back(1.0f);
         data.push_back(func(i));
         ofs << i << " " << data.back() << std::endl;
     }
-    /*for (uint i = 1000; i < 2000u; ++i)
+    for (uint i = 1000; i < 2000u; ++i)
     {
         data.push_back(0.0f);
         //data.push_back(std::sin(i * M_PI / 180.0f));
@@ -66,8 +79,8 @@ int main(int argc, char **argv)
         data.push_back(-10.0f);
         //data.push_back(std::sin(i * M_PI / 180.0f));
         ofs << i << " " << data.back() << std::endl;
-    }*/
-    ofs.close();
+    }
+    ofs.close();*/
 /*
 
     KernelOperation<float, WINDOW, NODES>::normWindow(data, &out, 120, 10);
@@ -81,13 +94,13 @@ int main(int argc, char **argv)
 */
 
     Kernel<float, WINDOW, NODES> krnl;
-    KernelOptimizer<float, WINDOW, NODES>::optimize(krnl, data, TARGET, TSIGMA, 1u, 0.0f, 1.0f, 50u, 0.001f);
-    KernelOperation<float, WINDOW, NODES>::applyKernel(krnl, data, &out, 1u);
-    KernelOperation<float, WINDOW, NODES>::print(krnl);
+    KernelOptimizer<float, WINDOW, NODES, GAUSSIAN>::optimize(krnl, data, TARGET, TSIGMA, 50u, 0.0f, 1.0f, 100u, 0.01f);
+    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::applyKernel(krnl, data, &out, 1u);
+    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::print(krnl);
     ofs.open("out.txt");
     for (uint i = 0; i < out.size(); ++i)
     {
-        ofs << i << " " << out[i] << std::endl;
+        ofs << i << " " << 100.0 * out[i] << std::endl;
     }
     ofs.close();
 
