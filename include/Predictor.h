@@ -99,7 +99,9 @@ public:
     // compute kernel response to an input vector
     static NumericalType response(const Kernel<NumericalType, Window, Nodes> &krnl,
                                   const std::vector<NumericalType> &data,
-                                  const uint startAt)
+                                  const uint startAt,
+                                  const NumericalType minVal,
+                                  const NumericalType scale)
     {
         NumericalType sum = (NumericalType)0.0;
         for (uint i = 0; i < Window; ++i)
@@ -110,14 +112,44 @@ public:
                 sum += gaussian(krnl.data[idx].mu,
                                 krnl.data[idx].sigma,
                                 krnl.data[idx].scale,
-                                data[startAt + i]);
+                                scale * (data[startAt + i] - minVal));
             }
         }
         return sum / (NumericalType)(Window * Nodes);
     }
 
+    // compute min max normalization
+    static void normalize(const std::vector<NumericalType> &data,
+                          const uint startAt,
+                          NumericalType *minVal,
+                          NumericalType *scaling)
+    {
+        // normalize data window to 0-1
+        NumericalType vmin = (NumericalType)FLT_MAX,
+                      vmax = (NumericalType)-FLT_MAX;
+        for (uint k = 0; k < Window; ++k)
+        {
+            const uint idx = startAt + k;
+            if (data[idx] < vmin) vmin = data[idx];
+            if (data[idx] > vmax) vmax = data[idx];
+        }
+        NumericalType scale;
+        if (vmin == vmax)
+        {
+            scale = (NumericalType)1.0;
+            vmin -= (NumericalType)0.5;
+        }
+        else
+        {
+            scale = (NumericalType)1.0 / (vmax - vmin);
+        }
+
+        // commit
+        *minVal = vmin;
+        *scaling = scale;
+    }
+
     // compute convolution error of input sequence
-    //TODO: select: minimize largest error
     static NumericalType convolution(const Kernel<NumericalType, Window, Nodes> &krnl,
                                      const std::vector<NumericalType> &data,
                                      const NumericalType targetValue,
@@ -128,9 +160,13 @@ public:
         NumericalType error = (NumericalType)0.0;
         for (uint i = 0; i <= limit; ++i)
         {
+            // normalize window
+            NumericalType vmin, scale;
+            normalize(data, i, &vmin, &scale);
+            // compute teacher and kernel response
             const NumericalType teacher = gaussian(targetValue, targetSigma,
-                                          (NumericalType)1.0, data[i + Window + ahead - 1]),
-                                resp    = response(krnl, data, i);
+                                          (NumericalType)1.0, scale * (data[i + Window + ahead - 1] - vmin)),
+                                resp    = response(krnl, data, i, vmin, scale);
             const NumericalType tmp = resp - teacher;
             error += tmp * tmp;
         }
@@ -148,7 +184,10 @@ public:
         const uint limit = data.size() - Window - ahead;
         for (uint i = 0; i <= limit; ++i)
         {
-            out->at(i + Window + ahead - 1) = response(krnl, data, i);
+            // normalize window
+            NumericalType vmin, scale;
+            normalize(data, i, &vmin, &scale);
+            out->at(i + Window + ahead - 1) = response(krnl, data, i, vmin, scale);
         }
     }
 };

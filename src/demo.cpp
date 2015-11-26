@@ -8,10 +8,10 @@
 using namespace Predictor;
 
 
-#define WINDOW 50
+#define WINDOW 100
 #define NODES  2
 #define TARGET 1.0
-#define TSIGMA 1.0
+#define TSIGMA 10.0
 
 #define RAD(_a) ((_a) * M_PI / 180.0)
 
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     }
     for (uint i = 3000; i < 4000u; ++i)
     {
-        data.push_back(5.0f);
+        data.push_back(10.0f);
         //data.push_back(std::sin(i * M_PI / 180.0f));
         ofs << i << " " << data.back() << std::endl;
     }*/
@@ -71,8 +71,8 @@ int main(int argc, char **argv)
 
 
     Kernel<float, WINDOW, NODES> krnl;
-    KernelOptimizer<float, WINDOW, NODES>::optimize(krnl, data, TARGET, TSIGMA, 100u, 0.0f, 1.0f, 100u, 0.02f);
-    KernelOperation<float, WINDOW, NODES>::applyKernel(krnl, data, &out, 100u);
+    KernelOptimizer<float, WINDOW, NODES>::optimize(krnl, data, TARGET, TSIGMA, 50u, 0.0f, 1.0f, 50u, 0.02f);
+    KernelOperation<float, WINDOW, NODES>::applyKernel(krnl, data, &out, 50u);
     KernelOperation<float, WINDOW, NODES>::print(krnl);
     ofs.open("out.txt");
     for (uint i = 0; i < out.size(); ++i)
