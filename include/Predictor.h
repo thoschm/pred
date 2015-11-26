@@ -190,6 +190,23 @@ public:
             out->at(i + Window + ahead - 1) = response(krnl, data, i, vmin, scale);
         }
     }
+
+    // dump normalized window
+    static void normWindow(const std::vector<NumericalType> &data,
+                           std::vector<NumericalType> *out,
+                           const uint startAt,
+                           const uint ahead)
+    {
+       out->clear();
+       out->resize(Window + ahead, (NumericalType)0.0);
+       NumericalType vmin, scale;
+       normalize(data, startAt, &vmin, &scale);
+       for (uint i = 0; i < Window + ahead; ++i)
+       {
+           // normalize window
+           out->at(i) = scale * (data[startAt + i] - vmin);
+       }
+   }
 };
 
 
