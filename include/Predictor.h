@@ -250,11 +250,16 @@ public:
     }
 
     // store kernel to file
-    static void storeKernel(const Kernel<NumericalType, Window, Nodes> &krnl,
+    static bool storeKernel(const Kernel<NumericalType, Window, Nodes> &krnl,
                             const char *file)
     {
         std::ofstream ofs;
         ofs.open(file, std::ios::binary | std::ios::out);
+        if (ofs.fail())
+        {
+            std::cerr << "failed to write kernel file!\n";
+            return false;
+        }
         const uint32_t w = Window,
                        n = Nodes,
                        s = sizeof(NumericalType);
@@ -268,14 +273,20 @@ public:
             ofs.write((char *)&(krnl.data[i].scale), sizeof(NumericalType));
         }
         ofs.close();
+        return true;
     }
 
     // store kernel vector to file
-    static void storeKernelVector(const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
+    static bool storeKernelVector(const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
                                   const char *file)
     {
         std::ofstream ofs;
         ofs.open(file, std::ios::binary | std::ios::out);
+        if (ofs.fail())
+        {
+            std::cerr << "failed to write kernel file!\n";
+            return false;
+        }
         const uint32_t w = Window,
                        n = Nodes,
                        s = sizeof(NumericalType),
@@ -294,6 +305,7 @@ public:
             }
         }
         ofs.close();
+        return true;
     }
 
     // store kernel to file
@@ -302,6 +314,11 @@ public:
     {
         std::ifstream ifs;
         ifs.open(file, std::ios::binary | std::ios::in);
+        if (ifs.fail())
+        {
+            std::cerr << "failed to read kernel file!\n";
+            return false;
+        }
         uint32_t w, n, s;
         ifs.read((char *)&w, sizeof(uint32_t));
         ifs.read((char *)&n, sizeof(uint32_t));
@@ -338,6 +355,11 @@ public:
         vec->clear();
         std::ifstream ifs;
         ifs.open(file, std::ios::binary | std::ios::in);
+        if (ifs.fail())
+        {
+            std::cerr << "failed to read kernel file!\n";
+            return false;
+        }
         uint32_t w, n, s, size;
         ifs.read((char *)&w, sizeof(uint32_t));
         ifs.read((char *)&n, sizeof(uint32_t));
