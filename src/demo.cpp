@@ -2,6 +2,7 @@
 
 #include <Predictor.h>
 #include <fstream>
+#include <stdlib.h>
 
 
 using namespace Predictor;
@@ -55,8 +56,17 @@ bool dumpSequence(const std::vector<float> &seq, const char *file)
 
 int main(int argc, char **argv)
 {
-    std::vector<float> indata, outdata;
+    if (argc != 2)
+    {
+        std::cerr << "Usage:\n   demo <sequence.txt>\n";
+        return EXIT_FAILURE;
+    }
 
+    std::vector<float> indata, outdata;
+    if (!loadSequence(&indata, argv[1]))
+    {
+        return EXIT_FAILURE;
+    }
 
 
 
