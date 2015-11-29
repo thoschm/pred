@@ -78,16 +78,16 @@ public:
     }
 
     // reset kernel
-    static void reset(Kernel<NumericalType, Window, Nodes> &krnl,
+    static void reset(Kernel<NumericalType, Window, Nodes> *krnl,
                       const NumericalType mu,
                       const NumericalType sigma,
                       const NumericalType scale)
     {
         for (uint i = 0; i < Window * Nodes; ++i)
         {
-            krnl.data[i].mu = mu;
-            krnl.data[i].sigma = sigma;
-            krnl.data[i].scale = scale;
+            krnl->data[i].mu = mu;
+            krnl->data[i].sigma = sigma;
+            krnl->data[i].scale = scale;
         }
     }
 
@@ -238,16 +238,139 @@ public:
                            const uint startAt,
                            const uint ahead)
     {
-       out->clear();
-       out->resize(Window + ahead, (NumericalType)0.0);
-       NumericalType vmin, scale;
-       normalize(data, startAt, &vmin, &scale);
-       for (uint i = 0; i < Window + ahead; ++i)
-       {
-           // normalize window
-           out->at(i) = scale * (data[startAt + i] - vmin);
-       }
-   }
+        out->clear();
+        out->resize(Window + ahead, (NumericalType)0.0);
+        NumericalType vmin, scale;
+        normalize(data, startAt, &vmin, &scale);
+        for (uint i = 0; i < Window + ahead; ++i)
+        {
+            // normalize window
+            out->at(i) = scale * (data[startAt + i] - vmin);
+        }
+    }
+
+    // store kernel to file
+    static void storeKernel(const Kernel<NumericalType, Window, Nodes> &krnl,
+                            const char *file)
+    {
+        std::ofstream ofs;
+        ofs.open(file, std::ios::binary | std::ios::out);
+        const uint32_t w = Window,
+                       n = Nodes,
+                       s = sizeof(NumericalType);
+        ofs.write((char *)&w, sizeof(const uint32_t));
+        ofs.write((char *)&n, sizeof(const uint32_t));
+        ofs.write((char *)&s, sizeof(const uint32_t));
+        for (uint i = 0; i < Window * Nodes; ++i)
+        {
+            ofs.write((char *)&(krnl.data[i].mu), sizeof(NumericalType));
+            ofs.write((char *)&(krnl.data[i].sigma), sizeof(NumericalType));
+            ofs.write((char *)&(krnl.data[i].scale), sizeof(NumericalType));
+        }
+        ofs.close();
+    }
+
+    // store kernel vector to file
+    static void storeKernelVector(const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
+                                  const char *file)
+    {
+        std::ofstream ofs;
+        ofs.open(file, std::ios::binary | std::ios::out);
+        const uint32_t w = Window,
+                       n = Nodes,
+                       s = sizeof(NumericalType),
+                       size = vec.size();
+        ofs.write((char *)&w, sizeof(const uint32_t));
+        ofs.write((char *)&n, sizeof(const uint32_t));
+        ofs.write((char *)&s, sizeof(const uint32_t));
+        ofs.write((char *)&size, sizeof(const uint32_t));
+        for (uint v = 0; v < size; ++v)
+        {
+            for (uint i = 0; i < Window * Nodes; ++i)
+            {
+                ofs.write((char *)&(vec[v].data[i].mu), sizeof(NumericalType));
+                ofs.write((char *)&(vec[v].data[i].sigma), sizeof(NumericalType));
+                ofs.write((char *)&(vec[v].data[i].scale), sizeof(NumericalType));
+            }
+        }
+        ofs.close();
+    }
+
+    // store kernel to file
+    static bool loadKernel(Kernel<NumericalType, Window, Nodes> *krnl,
+                           const char *file)
+    {
+        std::ifstream ifs;
+        ifs.open(file, std::ios::binary | std::ios::in);
+        uint32_t w, n, s;
+        ifs.read((char *)&w, sizeof(uint32_t));
+        ifs.read((char *)&n, sizeof(uint32_t));
+        ifs.read((char *)&s, sizeof(uint32_t));
+        if (w != Window)
+        {
+            std::cerr << "loading kernel failed: wrong window size!\n";
+            return false;
+        }
+        if (n != Nodes)
+        {
+            std::cerr << "loading kernel failed: wrong number of nodes!\n";
+            return false;
+        }
+        if (s != sizeof(NumericalType))
+        {
+            std::cerr << "loading kernel failed: wrong floating point type!\n";
+            return false;
+        }
+        for (uint i = 0; i < Window * Nodes; ++i)
+        {
+            ifs.read((char *)&(krnl->data[i].mu), sizeof(NumericalType));
+            ifs.read((char *)&(krnl->data[i].sigma), sizeof(NumericalType));
+            ifs.read((char *)&(krnl->data[i].scale), sizeof(NumericalType));
+        }
+        ifs.close();
+        return true;
+    }
+
+    // store kernel vector to file
+    static bool loadKernelVector(std::vector<Kernel<NumericalType, Window, Nodes> > *vec,
+                                 const char *file)
+    {
+        vec->clear();
+        std::ifstream ifs;
+        ifs.open(file, std::ios::binary | std::ios::in);
+        uint32_t w, n, s, size;
+        ifs.read((char *)&w, sizeof(uint32_t));
+        ifs.read((char *)&n, sizeof(uint32_t));
+        ifs.read((char *)&s, sizeof(uint32_t));
+        ifs.read((char *)&size, sizeof(uint32_t));
+        if (w != Window)
+        {
+            std::cerr << "loading kernel failed: wrong window size!\n";
+            return false;
+        }
+        if (n != Nodes)
+        {
+            std::cerr << "loading kernel failed: wrong number of nodes!\n";
+            return false;
+        }
+        if (s != sizeof(NumericalType))
+        {
+            std::cerr << "loading kernel failed: wrong floating point type!\n";
+            return false;
+        }
+        vec->resize(size);
+        for (uint v = 0; v < size; ++v)
+        {
+            for (uint i = 0; i < Window * Nodes; ++i)
+            {
+                ifs.read((char *)&(vec->at(v).data[i].mu), sizeof(NumericalType));
+                ifs.read((char *)&(vec->at(v).data[i].sigma), sizeof(NumericalType));
+                ifs.read((char *)&(vec->at(v).data[i].scale), sizeof(NumericalType));
+            }
+        }
+        ifs.close();
+        return true;
+    }
 };
 
 
@@ -272,7 +395,7 @@ public:
     };
 
 
-    static NumericalType optimize(Kernel<NumericalType, Window, Nodes> &result,
+    static NumericalType optimize(Kernel<NumericalType, Window, Nodes> *result,
                                   const std::vector<NumericalType> &data,
                                   const NumericalType targetValue,
                                   const NumericalType targetSigma,
@@ -301,9 +424,9 @@ public:
         uint cnt = 0;
         for (uint i = 0; i < Window * Nodes; ++i)
         {
-            result.data[i].mu    = values[cnt++];
-            result.data[i].sigma = std::fabs(values[cnt++]) + pl.minSigma;
-            result.data[i].scale = values[cnt++];
+            result->data[i].mu    = values[cnt++];
+            result->data[i].sigma = std::fabs(values[cnt++]) + pl.minSigma;
+            result->data[i].scale = values[cnt++];
         }
 
         return pso.getScore();
@@ -334,10 +457,10 @@ public:
 
         // compute cost
         return KernelOperation<NumericalType, Window, Nodes, TFunc>::convolution(krnl,
-                                                                                *(pl->data),
-                                                                                pl->targetValue,
-                                                                                pl->targetSigma,
-                                                                                pl->targetAhead);
+                                                                                 *(pl->data),
+                                                                                 pl->targetValue,
+                                                                                 pl->targetSigma,
+                                                                                 pl->targetAhead);
     }
 
 
