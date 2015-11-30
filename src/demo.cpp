@@ -12,12 +12,12 @@ using namespace Predictor;
 #define NODES  2u
 #define PARTICLES 100u
 #define LOOK_AHEAD 5u
-#define BREAK_ERROR 0.01f
+#define BREAK_ERROR 0.05f
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f
 #define KRNL_MAX  2.0f
-#define KRNL_STEP 0.5f
+#define KRNL_STEP 0.2f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -97,6 +97,9 @@ int main(int argc, char **argv)
 
     // store result
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
+    std::cerr << "results stored as kernels.bin\n";
+
+    KernelOperation<float, WINDOW, NODES>::queryKernels(vec, indata);
 
     return 0;
 }

@@ -232,6 +232,20 @@ public:
         }
     }
 
+    // quere kernel vector
+    static void queryKernels(const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
+                             const std::vector<NumericalType> &data)
+    {
+        const uint idx = data.size() - Window;
+        // normalize window
+        NumericalType vmin, scale;
+        normalize(data, idx, &vmin, &scale);
+        for (uint i = 0; i < vec.size(); ++i)
+        {
+            std::cerr << "kernel " << i << ": " << response(vec[i], data, idx, vmin, scale) << std::endl;
+        }
+    }
+
     // dump normalized window
     static void normWindow(const std::vector<NumericalType> &data,
                            std::vector<NumericalType> *out,
@@ -441,7 +455,7 @@ public:
         {
             std::cerr << "\roptimization error=" << s;
         }
-        std::cerr << std::endl;
+        std::cerr << "\roptimization error=" << s << std::endl;
         const NumericalType *values = pso.getBest();
 
         uint cnt = 0;

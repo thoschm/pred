@@ -141,7 +141,7 @@ struct Particle
 // PSO class
 /////////////////////////////////
 //#define PSO_MT
-#define PSO_OMP
+//#define PSO_OMP
 //#define THREADS 20u
 
 template <typename NumericalType, int Dim>
