@@ -439,8 +439,9 @@ public:
         NumericalType s;
         while ((s = pso.step()) > breakScore)
         {
-            std::cout << s << std::endl;
+            std::cerr << "\roptimization error=" << s;
         }
+        std::cerr << std::endl;
         const NumericalType *values = pso.getBest();
 
         uint cnt = 0;

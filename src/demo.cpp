@@ -8,10 +8,16 @@
 using namespace Predictor;
 
 
-#define WINDOW 20
-#define NODES  5
-#define TARGET 1.0
-#define TSIGMA 10.0
+#define WINDOW 100u
+#define NODES  2u
+#define PARTICLES 100u
+#define LOOK_AHEAD 5u
+#define BREAK_ERROR 0.1f
+
+#define TSIGMA 10.0f
+#define KRNL_MIN -1.0f
+#define KRNL_MAX  2.0f
+#define KRNL_STEP 0.5f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -56,77 +62,41 @@ bool dumpSequence(const std::vector<float> &seq, const char *file)
 
 int main(int argc, char **argv)
 {
+    // check args
     if (argc != 2)
     {
         std::cerr << "Usage:\n   demo <sequence.txt>\n";
         return EXIT_FAILURE;
     }
 
+    // load input sequence
     std::vector<float> indata, outdata;
     if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
     }
 
-
-
-    
-      
-    /*
-
-    Kernel<float, WINDOW, NODES> krnl, krnl2;
-    KernelOptimizer<float, WINDOW, NODES, GAUSSIAN>::optimize(&krnl, data, TARGET, TSIGMA, 50u, 0.0f, 1.0f, 100u, 0.1f);
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::applyKernel(krnl, data, &out, 1u);
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::print(krnl);
-
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::reset(&krnl2, 1.0f, 1.0f, 1.0f);
-
-    std::vector<Kernel<float, WINDOW, NODES> > vec, vec2;
-    vec.push_back(krnl);
-    vec.push_back(krnl2);
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::storeKernelVector(vec, "vec.bin");
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::loadKernelVector(&vec2, "vec.bin");
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::print(vec[0]);
-    KernelOperation<float, WINDOW, NODES, GAUSSIAN>::print(vec[1]);
-
-
-
-
-    ofs.open("out.txt");
-    for (uint i = 0; i < out.size(); ++i)
+    // learn kernels
+    uint c = 0;
+    std::vector<Kernel<float, WINDOW, NODES> > vec;
+    for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP, ++c)
     {
-        ofs << i << " " << out[i] << std::endl;
+        std::cerr << "*** learning kernel " << c << " ***" << std::endl
+                  << "kernel target: " << k << ", target sigma: " << TSIGMA << std::endl;
+        Kernel<float, WINDOW, NODES> krnl;
+        KernelOptimizer<float, WINDOW, NODES>::optimize(&krnl,
+                                                        indata, k,
+                                                        TSIGMA,
+                                                        LOOK_AHEAD,
+                                                        0.0f, 1.0f,
+                                                        PARTICLES,
+                                                        BREAK_ERROR);
+        std::cerr << "optimization done." << std::endl;
+        vec.push_back(krnl);
     }
-    ofs.close();
 
-
-    ofs.open("kernel.txt");
-    for (uint i = 0; i < WINDOW; ++i)
-    {
-        for (uint k = 0; k < NODES; ++k)
-        {
-            const uint idx = i * NODES + k;
-            if (krnl.data[idx].scale > 1.0 && krnl.data[idx].sigma > 5.0)
-            {
-                ofs << i << " " << krnl.data[idx].mu << std::endl;
-            }
-        }
-    }
-    ofs.close();
-    /*
-    ofs.open("scale.txt");
-    for (uint i = 0; i < KERNEL_SIZE; ++i)
-    {
-       ofs << i << " " << krnl.data[i].scale << std::endl;
-    }
-    ofs.close();
-    ofs.open("sigma.txt");
-    for (uint i = 0; i < KERNEL_SIZE; ++i)
-    {
-       ofs << i << " " << krnl.data[i].sigma << std::endl;
-    }
-    ofs.close();*/
-
+    // store result
+    KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
 
     return 0;
 }
