@@ -12,7 +12,7 @@ using namespace Predictor;
 #define NODES  2u
 #define PARTICLES 100u
 #define LOOK_AHEAD 5u
-#define BREAK_ERROR 0.1f
+#define BREAK_ERROR 0.01f
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f
@@ -91,7 +91,7 @@ int main(int argc, char **argv)
                                                         0.0f, 1.0f,
                                                         PARTICLES,
                                                         BREAK_ERROR);
-        std::cerr << "optimization done." << std::endl;
+        std::cerr << "--> optimization done." << std::endl << std::endl;
         vec.push_back(krnl);
     }
 

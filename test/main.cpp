@@ -30,7 +30,7 @@ int main(int argc, char **argv)
         {
             nexttime = stamp + interval;
             ofs << lastPrice << std::endl;
-            //std::cerr << stamp << " " << lastPrice << std::endl;        
+            std::cerr << stamp << " " << lastPrice << std::endl;
         }
         lastPrice = price;        
     }
