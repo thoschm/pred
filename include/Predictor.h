@@ -241,10 +241,11 @@ public:
     // quere kernel vector
     static void queryKernels(std::vector<NumericalType> *activations,
                              const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
-                             const std::vector<NumericalType> &data)
+                             const std::vector<NumericalType> &data,
+                             const uint index = UINT_MAX)
     {
         activations->clear();
-        const uint idx = data.size() - Window;
+        const uint idx = std::min((uint)(data.size() - Window), index);
         // normalize window
         NumericalType vmin, scale;
         normalize(data, idx, &vmin, &scale);
