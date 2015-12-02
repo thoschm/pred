@@ -12,7 +12,7 @@ using namespace Predictor;
 #define NODES  2u
 #define PARTICLES 100u
 #define LOOK_AHEAD 5u
-#define BREAK_ERROR 0.05f
+#define BREAK_ERROR 0.1f
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f
@@ -62,6 +62,17 @@ bool dumpSequence(const std::vector<float> &seq, const char *file)
 
 int main(int argc, char **argv)
 {
+    std::vector<Kernel<float, WINDOW, NODES> > k;
+    KernelOperation<float, WINDOW, NODES>::loadKernelVector(&k, "kernels.bin");
+
+    for (uint i = 0; i < k.size(); ++i)
+    {
+        KernelOperation<float, WINDOW, NODES>::print(k[i]);
+    }
+
+
+
+
     // check args
     if (argc != 2)
     {

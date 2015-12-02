@@ -39,6 +39,8 @@ struct MuSigmaScale
 template <typename NumericalType, int Window, int Nodes>
 struct Kernel
 {
+    NumericalType targetVal,
+                  targetSig;
     MuSigmaScale<NumericalType> data[Window * Nodes];
 };
 
@@ -63,6 +65,8 @@ public:
     // print
     static void print(const Kernel<NumericalType, Window, Nodes> &krnl)
     {
+        std::cerr << "target: " << krnl.targetVal << std::endl
+                  << "tsigma: " << krnl.targetSig << std::endl;
         for (uint i = 0; i < Window; ++i)
         {
             std::cerr << i << ": ";
@@ -83,6 +87,8 @@ public:
                       const NumericalType sigma,
                       const NumericalType scale)
     {
+        krnl->targetVal = (NumericalType)FLT_MAX;
+        krnl->targetSig = (NumericalType)FLT_MAX;
         for (uint i = 0; i < Window * Nodes; ++i)
         {
             krnl->data[i].mu = mu;
@@ -280,6 +286,8 @@ public:
         ofs.write((char *)&w, sizeof(const uint32_t));
         ofs.write((char *)&n, sizeof(const uint32_t));
         ofs.write((char *)&s, sizeof(const uint32_t));
+        ofs.write((char *)&krnl.targetVal, sizeof(NumericalType));
+        ofs.write((char *)&krnl.targetSig, sizeof(NumericalType));
         for (uint i = 0; i < Window * Nodes; ++i)
         {
             ofs.write((char *)&(krnl.data[i].mu), sizeof(NumericalType));
@@ -311,6 +319,8 @@ public:
         ofs.write((char *)&size, sizeof(const uint32_t));
         for (uint v = 0; v < size; ++v)
         {
+            ofs.write((char *)&(vec[v].targetVal), sizeof(NumericalType));
+            ofs.write((char *)&(vec[v].targetSig), sizeof(NumericalType));
             for (uint i = 0; i < Window * Nodes; ++i)
             {
                 ofs.write((char *)&(vec[v].data[i].mu), sizeof(NumericalType));
@@ -340,18 +350,23 @@ public:
         if (w != Window)
         {
             std::cerr << "loading kernel failed: wrong window size!\n";
+            ifs.close();
             return false;
         }
         if (n != Nodes)
         {
             std::cerr << "loading kernel failed: wrong number of nodes!\n";
+            ifs.close();
             return false;
         }
         if (s != sizeof(NumericalType))
         {
             std::cerr << "loading kernel failed: wrong floating point type!\n";
+            ifs.close();
             return false;
         }
+        ifs.read((char *)&(krnl->targetVal), sizeof(NumericalType));
+        ifs.read((char *)&(krnl->targetSig), sizeof(NumericalType));
         for (uint i = 0; i < Window * Nodes; ++i)
         {
             ifs.read((char *)&(krnl->data[i].mu), sizeof(NumericalType));
@@ -382,21 +397,26 @@ public:
         if (w != Window)
         {
             std::cerr << "loading kernel failed: wrong window size!\n";
+            ifs.close();
             return false;
         }
         if (n != Nodes)
         {
             std::cerr << "loading kernel failed: wrong number of nodes!\n";
+            ifs.close();
             return false;
         }
         if (s != sizeof(NumericalType))
         {
             std::cerr << "loading kernel failed: wrong floating point type!\n";
+            ifs.close();
             return false;
         }
         vec->resize(size);
         for (uint v = 0; v < size; ++v)
         {
+            ifs.read((char *)&(vec->at(v).targetVal), sizeof(NumericalType));
+            ifs.read((char *)&(vec->at(v).targetSig), sizeof(NumericalType));
             for (uint i = 0; i < Window * Nodes; ++i)
             {
                 ifs.read((char *)&(vec->at(v).data[i].mu), sizeof(NumericalType));
@@ -466,6 +486,10 @@ public:
             result->data[i].scale = values[cnt++];
         }
 
+        // set target
+        result->targetVal = targetValue;
+        result->targetSig = targetSigma;
+
         return pso.getScore();
     }
 
@@ -502,6 +526,104 @@ public:
 
 
 };
+
+/*
+/////////////////////////////////
+// MAXIMUM LIKELIHOOD ESTIMATION
+/////////////////////////////////
+template <typename NumericalType, int Window, int Nodes>
+class MLE
+{
+    MLE();
+    MLE(const MLE &other);
+    MLE &operator=(const MLE &other);
+
+public:
+    struct Payload
+    {
+        const std::vector<Kernel<NumericalType, Window, Nodes> > *kvec;
+        const std::vector<NumericalType> *activation;
+        NumericalType minSigma;
+    };
+
+    static NumericalType compute(NumericalType *mu,
+                                 NumericalType *sigma,
+                                 const std::vector<Kernel<NumericalType, Window, Nodes> > &kvec,
+                                 const std::vector<NumericalType> &activation,
+                                 const uint particleCount = 100u,
+                                 const uint lowerLimit = (NumericalType)-1.0,
+                                 const uint upperLimit = (NumericalType)2.0,
+                                 const uint loops = 100u)
+
+    {
+        // check
+        if (kvec.size() != activation.size())
+        {
+            std::cerr << "invalid number of kernel activations\n";
+            return (NumericalType)FLT_MAX;
+        }
+
+        // assemble payload
+        Payload pl;
+        pl.kvec = &kvec;
+        pl.activation = &activation;
+        pl.minSigma = 0.00001f;
+
+        PSO<NumericalType, 2> pso(particleCount, scoreFunc, (const void *)&pl);
+        pso.init(lowerLimit, upperLimit);
+        NumericalType s;
+        for (uint i = 0; i < loops; ++i)
+        {
+            std::cerr << "\roptimization error=" << (s = pso.step());
+        }
+        std::cerr << "\roptimization error=" << s << std::endl;
+        const NumericalType *values = pso.getBest();
+
+        // write
+        *mu = values[0];
+        *sigma = std::fabs(values[1]) + pl.minSigma;
+        return pso.getScore();
+    }
+
+
+    static NumericalType scoreFunc(const NumericalType *values, const uint dim, const void *payload)
+    {
+        // check dim
+        if (dim != 2)
+        {
+            std::cerr << "score: invalid dimensions\n";
+            return (NumericalType)FLT_MAX;
+        }
+
+        // get payload
+        const Payload *pl = (const Payload *)payload;
+        const uint size = pl->kvec->size();
+
+        // get mu, sigma
+        const NumericalType mu = values[0],
+                            sigma = std::fabs(values[1]) + pl->minSigma;
+
+        // score
+        NumericalType score = (NumericalType)1.0;
+        for (uint i = 0; i < size; ++i)
+        {
+            score *= pl->activation->at(i) * gaussian(mu, sigma, (NumericalType)1.0, pl->kvec->at(i).targetVal);
+        }
+        return -score;
+
+    }
+
+    // compute simple gaussian with custom scaling
+    static NumericalType gaussian(const NumericalType mu,
+                                  const NumericalType sigma,
+                                  const NumericalType scale,
+                                  const NumericalType value)
+    {
+        const NumericalType d = value - mu;
+        return scale * std::exp((NumericalType)-0.5 * d * d / (sigma * sigma));
+    }
+};
+*/
 
 }
 
