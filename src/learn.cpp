@@ -12,7 +12,7 @@ using namespace Predictor;
 #define NODES  3u
 #define PARTICLES 100u
 #define LOOK_AHEAD 10u
-#define BREAK_ERROR 0.01f
+#define BREAK_ERROR 0.05f
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f

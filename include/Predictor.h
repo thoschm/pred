@@ -462,7 +462,8 @@ public:
                                   const NumericalType lowerLimit,
                                   const NumericalType upperLimit,
                                   const uint particleCount,
-                                  const NumericalType breakScore)
+                                  const NumericalType breakScore,
+                                  const uint breakLoops = UINT_MAX)
     {
         Payload pl;
         pl.data = &data;
@@ -474,9 +475,11 @@ public:
         PSO<NumericalType, Window * Nodes * 3> pso(particleCount, scoreFunc, (const void *)&pl);
         pso.init(lowerLimit, upperLimit);
         NumericalType s;
+        uint l = 0;
         while ((s = pso.step()) > breakScore)
         {
             std::cerr << "\roptimization error = " << s;
+            if (++l == breakLoops) break;
         }
         std::cerr << "\roptimization error = " << s << std::endl;
         const NumericalType *values = pso.getBest();
