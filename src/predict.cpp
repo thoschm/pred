@@ -8,8 +8,8 @@
 using namespace Predictor;
 
 
-#define WINDOW 200u
-#define NODES  3u
+#define WINDOW 50u
+#define NODES  2u
 #define LOOK_AHEAD 10u
 
 
@@ -76,8 +76,7 @@ int main(int argc, char **argv)
 
     // get activations
     std::vector<float> activations;
-    KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, vec, indata);
-
+    KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, vec, indata, 11700u);
     std::cerr << "results:" << std::endl;
     for (uint i = 0; i < vec.size(); ++i)
     {

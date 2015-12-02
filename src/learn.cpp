@@ -8,11 +8,11 @@
 using namespace Predictor;
 
 
-#define WINDOW 200u
-#define NODES  3u
-#define PARTICLES 100u
-#define LOOK_AHEAD 10u
-#define BREAK_ERROR 0.05f
+#define WINDOW 50u
+#define NODES  2u
+#define PARTICLES 10u
+#define LOOK_AHEAD 25u
+#define BREAK_ERROR 0.01f
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f
@@ -90,7 +90,8 @@ int main(int argc, char **argv)
                                                         LOOK_AHEAD,
                                                         0.0f, 1.0f,
                                                         PARTICLES,
-                                                        BREAK_ERROR);
+                                                        BREAK_ERROR,
+                                                        1000u);
         std::cerr << "--> optimization done." << std::endl << std::endl;
         vec.push_back(krnl);
     }
