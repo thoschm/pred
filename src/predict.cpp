@@ -8,16 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 300u
+#define WINDOW 200u
 #define NODES  3u
-#define PARTICLES 100u
 #define LOOK_AHEAD 10u
-#define BREAK_ERROR 0.005f
-
-#define TSIGMA 10.0f
-#define KRNL_MIN -1.0f
-#define KRNL_MAX  2.0f
-#define KRNL_STEP 0.1f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -65,39 +58,21 @@ int main(int argc, char **argv)
     // check args
     if (argc != 2)
     {
-        std::cerr << "Usage:\n   demo <sequence.txt>\n";
+        std::cerr << "Usage:\n   predict <sequence.txt>\n";
         return EXIT_FAILURE;
     }
 
     // load input sequence
-    std::vector<float> indata, outdata;
+    std::vector<float> indata;
     if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
     }
 
-    // learn kernels
-    uint c = 0;
-    std::vector<Kernel<float, WINDOW, NODES> > vec;
-    for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP, ++c)
-    {
-        std::cerr << "*** learning kernel " << c << " ***" << std::endl
-                  << "kernel target: " << k << ", target sigma: " << TSIGMA << std::endl;
-        Kernel<float, WINDOW, NODES> krnl;
-        KernelOptimizer<float, WINDOW, NODES>::optimize(&krnl,
-                                                        indata, k,
-                                                        TSIGMA,
-                                                        LOOK_AHEAD,
-                                                        0.0f, 1.0f,
-                                                        PARTICLES,
-                                                        BREAK_ERROR);
-        std::cerr << "--> optimization done." << std::endl << std::endl;
-        vec.push_back(krnl);
-    }
-
     // store result
-    KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
-    std::cerr << "results stored as kernels.bin\n";
+    std::vector<Kernel<float, WINDOW, NODES> > vec;
+    KernelOperation<float, WINDOW, NODES>::loadKernelVector(&vec, "kernels.bin");
+    std::cerr << "loaded kernels.bin\n";
 
     // get activations
     std::vector<float> activations;
