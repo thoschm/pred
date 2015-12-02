@@ -62,17 +62,6 @@ bool dumpSequence(const std::vector<float> &seq, const char *file)
 
 int main(int argc, char **argv)
 {
-    std::vector<Kernel<float, WINDOW, NODES> > k;
-    KernelOperation<float, WINDOW, NODES>::loadKernelVector(&k, "kernels.bin");
-
-    for (uint i = 0; i < k.size(); ++i)
-    {
-        KernelOperation<float, WINDOW, NODES>::print(k[i]);
-    }
-
-
-
-
     // check args
     if (argc != 2)
     {
@@ -110,7 +99,8 @@ int main(int argc, char **argv)
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
     std::cerr << "results stored as kernels.bin\n";
 
-    KernelOperation<float, WINDOW, NODES>::queryKernels(vec, indata);
+    std::vector<float> activations;
+    KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, vec, indata);
 
     return 0;
 }

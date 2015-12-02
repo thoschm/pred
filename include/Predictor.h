@@ -239,16 +239,18 @@ public:
     }
 
     // quere kernel vector
-    static void queryKernels(const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
+    static void queryKernels(std::vector<NumericalType> *activations,
+                             const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
                              const std::vector<NumericalType> &data)
     {
+        activations->clear();
         const uint idx = data.size() - Window;
         // normalize window
         NumericalType vmin, scale;
         normalize(data, idx, &vmin, &scale);
         for (uint i = 0; i < vec.size(); ++i)
         {
-            std::cerr << "kernel " << i << ": " << response(vec[i], data, idx, vmin, scale) << std::endl;
+            activations->push_back(response(vec[i], data, idx, vmin, scale));
         }
     }
 
@@ -524,106 +526,44 @@ public:
                                                                                  pl->targetAhead);
     }
 
-
-};
-
-/*
-/////////////////////////////////
-// MAXIMUM LIKELIHOOD ESTIMATION
-/////////////////////////////////
-template <typename NumericalType, int Window, int Nodes>
-class MLE
-{
-    MLE();
-    MLE(const MLE &other);
-    MLE &operator=(const MLE &other);
-
-public:
-    struct Payload
-    {
-        const std::vector<Kernel<NumericalType, Window, Nodes> > *kvec;
-        const std::vector<NumericalType> *activation;
-        NumericalType minSigma;
-    };
-
-    static NumericalType compute(NumericalType *mu,
-                                 NumericalType *sigma,
-                                 const std::vector<Kernel<NumericalType, Window, Nodes> > &kvec,
-                                 const std::vector<NumericalType> &activation,
-                                 const uint particleCount = 100u,
-                                 const uint lowerLimit = (NumericalType)-1.0,
-                                 const uint upperLimit = (NumericalType)2.0,
-                                 const uint loops = 100u)
-
+    // compute weighted mean and variance
+    static void weightedMeanSigma(NumericalType *mu,
+                                  NumericalType *sigma,
+                                  const std::vector<Kernel<NumericalType, Window, Nodes> > &kvec,
+                                  const std::vector<NumericalType> &activation)
     {
         // check
         if (kvec.size() != activation.size())
         {
             std::cerr << "invalid number of kernel activations\n";
-            return (NumericalType)FLT_MAX;
+            return;
         }
 
-        // assemble payload
-        Payload pl;
-        pl.kvec = &kvec;
-        pl.activation = &activation;
-        pl.minSigma = 0.00001f;
-
-        PSO<NumericalType, 2> pso(particleCount, scoreFunc, (const void *)&pl);
-        pso.init(lowerLimit, upperLimit);
-        NumericalType s;
-        for (uint i = 0; i < loops; ++i)
+        // compute weighted mean
+        NumericalType wsum = (NumericalType)0.0,
+                         s = (NumericalType)0.0;
+        for (uint i = 0; i < kvec.size(); ++i)
         {
-            std::cerr << "\roptimization error=" << (s = pso.step());
+            s += activation[i] * kvec[i].targetVal;
+            wsum += activation[i];
         }
-        std::cerr << "\roptimization error=" << s << std::endl;
-        const NumericalType *values = pso.getBest();
+        const NumericalType mean = s / wsum;
 
-        // write
-        *mu = values[0];
-        *sigma = std::fabs(values[1]) + pl.minSigma;
-        return pso.getScore();
-    }
-
-
-    static NumericalType scoreFunc(const NumericalType *values, const uint dim, const void *payload)
-    {
-        // check dim
-        if (dim != 2)
+        // compute weighted variance
+        s = (NumericalType)0.0;
+        for (uint i = 0; i < kvec.size(); ++i)
         {
-            std::cerr << "score: invalid dimensions\n";
-            return (NumericalType)FLT_MAX;
+            const NumericalType tmp = kvec[i].targetVal - mean;
+            s += activation[i] * tmp * tmp;
         }
+        const NumericalType sig = std::sqrt(s / wsum); // biased estimator
 
-        // get payload
-        const Payload *pl = (const Payload *)payload;
-        const uint size = pl->kvec->size();
-
-        // get mu, sigma
-        const NumericalType mu = values[0],
-                            sigma = std::fabs(values[1]) + pl->minSigma;
-
-        // score
-        NumericalType score = (NumericalType)1.0;
-        for (uint i = 0; i < size; ++i)
-        {
-            score *= pl->activation->at(i) * gaussian(mu, sigma, (NumericalType)1.0, pl->kvec->at(i).targetVal);
-        }
-        return -score;
-
-    }
-
-    // compute simple gaussian with custom scaling
-    static NumericalType gaussian(const NumericalType mu,
-                                  const NumericalType sigma,
-                                  const NumericalType scale,
-                                  const NumericalType value)
-    {
-        const NumericalType d = value - mu;
-        return scale * std::exp((NumericalType)-0.5 * d * d / (sigma * sigma));
+        // commit
+        *mu = mean;
+        *sigma = sig;
     }
 };
-*/
+
 
 }
 
