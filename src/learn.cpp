@@ -8,17 +8,17 @@
 using namespace Predictor;
 
 
-#define WINDOW 48u
-#define NODES  5u
-#define LOOK_AHEAD 3u
+#define WINDOW 10u
+#define NODES  10u
+#define LOOK_AHEAD 10u
 
-#define PARTICLES 100u
+#define PARTICLES 1000u
 #define BREAK_ERROR 0.01f
-#define BREAK_LOOPS 100u
+#define BREAK_LOOPS 1000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN -1.0f
-#define KRNL_MAX  2.0f
+#define KRNL_MIN -0.5f
+#define KRNL_MAX  1.5f
 #define KRNL_STEP 0.1f
 
 
