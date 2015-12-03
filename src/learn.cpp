@@ -8,18 +8,18 @@
 using namespace Predictor;
 
 
-#define WINDOW 10u
-#define NODES  10u
-#define LOOK_AHEAD 10u
+#define WINDOW 500u
+#define NODES  2u
+#define LOOK_AHEAD 123u
 
-#define PARTICLES 1000u
-#define BREAK_ERROR 0.01f
+#define PARTICLES 100u
+#define BREAK_ERROR 0.001f
 #define BREAK_LOOPS 1000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN -0.5f
-#define KRNL_MAX  1.5f
-#define KRNL_STEP 0.1f
+#define KRNL_MIN -5.0f
+#define KRNL_MAX  6.0f
+#define KRNL_STEP 0.2f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -73,10 +73,17 @@ int main(int argc, char **argv)
 
     // load input sequence
     std::vector<float> indata;
-    if (!loadSequence(&indata, argv[1]))
+    /*if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
+    }*/
+
+    for (uint i = 0; i < 2000u; ++i)
+    {
+        indata.push_back(std::sin(0.1 * i));
     }
+
+    dumpSequence(indata, "sine.txt");
 
     // learn kernels
     uint c = 0;

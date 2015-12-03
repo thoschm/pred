@@ -10,7 +10,7 @@ using namespace Predictor;
 
 #define WINDOW 500u
 #define NODES  2u
-#define LOOK_AHEAD 100u
+#define LOOK_AHEAD 123u
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -76,14 +76,22 @@ int main(int argc, char **argv)
 
     // get activations
     std::vector<float> activations, prediction;
-    float mu = 0.0f, sig = 0.0f;
     const uint size = indata.size() - WINDOW;
     outdata.resize(indata.size() + LOOK_AHEAD, 0.0f);
     for (uint i = 0; i <= size; ++i)
     {
         KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, i);
-        KernelOptimizer<float, WINDOW, NODES>::weightedMeanSigma(&mu, &sig, activations, prediction);
-        outdata[i + WINDOW + LOOK_AHEAD - 1] = mu;
+        float mf = 0.0f;
+        uint idx;
+        for (uint k = 0; k < activations.size(); ++k)
+        {
+            if (activations[k] > mf)
+            {
+                mf = activations[k];
+                idx = k;
+            }
+        }
+        outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx];
     }
 
     // write
