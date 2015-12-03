@@ -239,19 +239,22 @@ public:
     }
 
     // quere kernel vector
-    static void queryKernels(std::vector<NumericalType> *activations,
+    static void queryKernels(std::vector<NumericalType> *activation,
+                             std::vector<NumericalType> *prediction,
                              const std::vector<Kernel<NumericalType, Window, Nodes> > &vec,
                              const std::vector<NumericalType> &data,
                              const uint index = UINT_MAX)
     {
-        activations->clear();
+        activation->clear();
+        prediction->clear();
         const uint idx = std::min((uint)(data.size() - Window), index);
         // normalize window
         NumericalType vmin, scale;
         normalize(data, idx, &vmin, &scale);
         for (uint i = 0; i < vec.size(); ++i)
         {
-            activations->push_back(response(vec[i], data, idx, vmin, scale));
+            activation->push_back(response(vec[i], data, idx, vmin, scale));
+            prediction->push_back(vmin + vec[i].targetVal / scale);
         }
     }
 
@@ -533,11 +536,11 @@ public:
     // compute weighted mean and variance
     static void weightedMeanSigma(NumericalType *mu,
                                   NumericalType *sigma,
-                                  const std::vector<Kernel<NumericalType, Window, Nodes> > &kvec,
-                                  const std::vector<NumericalType> &activation)
+                                  const std::vector<NumericalType> &activation,
+                                  const std::vector<NumericalType> &prediction)
     {
         // check
-        if (kvec.size() != activation.size())
+        if (prediction.size() != activation.size())
         {
             std::cerr << "invalid number of kernel activations\n";
             return;
@@ -546,18 +549,18 @@ public:
         // compute weighted mean
         NumericalType wsum = (NumericalType)0.0,
                          s = (NumericalType)0.0;
-        for (uint i = 0; i < kvec.size(); ++i)
+        for (uint i = 0; i < prediction.size(); ++i)
         {
-            s += activation[i] * kvec[i].targetVal;
+            s += activation[i] * prediction[i];
             wsum += activation[i];
         }
         const NumericalType mean = s / wsum;
 
         // compute weighted variance
         s = (NumericalType)0.0;
-        for (uint i = 0; i < kvec.size(); ++i)
+        for (uint i = 0; i < prediction.size(); ++i)
         {
-            const NumericalType tmp = kvec[i].targetVal - mean;
+            const NumericalType tmp = prediction[i] - mean;
             s += activation[i] * tmp * tmp;
         }
         const NumericalType sig = std::sqrt(s / wsum); // biased estimator
