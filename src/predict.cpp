@@ -8,9 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 50u
-#define NODES  2u
-#define LOOK_AHEAD 10u
+#define WINDOW 48u
+#define NODES  5u
+#define LOOK_AHEAD 3u
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     }
 
     // load input sequence
-    std::vector<float> indata;
+    std::vector<float> indata, outdata;
     if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
@@ -75,17 +75,19 @@ int main(int argc, char **argv)
     std::cerr << "loaded kernels.bin\n";
 
     // get activations
-    std::vector<float> activations;
-    KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, vec, indata, 11700u);
-    std::cerr << "results:" << std::endl;
-    for (uint i = 0; i < vec.size(); ++i)
+    std::vector<float> activations, prediction;
+    float mu = 0.0f, sig = 0.0f;
+    const uint size = indata.size() - WINDOW;
+    outdata.resize(indata.size() + LOOK_AHEAD, 0.0f);
+    for (uint i = 0; i <= size; ++i)
     {
-        std::cerr << "target " << vec[i].targetVal << ": " << activations[i] << std::endl;
+        KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, i);
+        KernelOptimizer<float, WINDOW, NODES>::weightedMeanSigma(&mu, &sig, activations, prediction);
+        outdata[i + WINDOW + LOOK_AHEAD - 1] = mu;
     }
-    float mu, sig;
-    KernelOptimizer<float, WINDOW, NODES>::weightedMeanSigma(&mu, &sig, vec, activations);
-    std::cerr << "MU.: " << mu << std::endl
-              << "SIG: " << sig << std::endl;
+
+    // write
+    dumpSequence(outdata, "pred.txt");
 
     return 0;
 }

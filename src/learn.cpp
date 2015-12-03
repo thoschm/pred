@@ -10,9 +10,11 @@ using namespace Predictor;
 
 #define WINDOW 48u
 #define NODES  5u
-#define PARTICLES 50u
 #define LOOK_AHEAD 3u
+
+#define PARTICLES 100u
 #define BREAK_ERROR 0.01f
+#define BREAK_LOOPS 100u
 
 #define TSIGMA 10.0f
 #define KRNL_MIN -1.0f
@@ -91,7 +93,7 @@ int main(int argc, char **argv)
                                                         0.0f, 1.0f,
                                                         PARTICLES,
                                                         BREAK_ERROR,
-                                                        1000u);
+                                                        BREAK_LOOPS);
         std::cerr << "--> optimization done." << std::endl << std::endl;
         vec.push_back(krnl);
     }
@@ -99,20 +101,6 @@ int main(int argc, char **argv)
     // store result
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
     std::cerr << "results stored as kernels.bin\n";
-
-    // get activations
-    std::vector<float> activations, prediction;
-    KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, 11600);
-
-    std::cerr << "results:" << std::endl;
-    for (uint i = 0; i < vec.size(); ++i)
-    {
-        std::cerr << "target " << prediction[i] << ": " << activations[i] << std::endl;
-    }
-    float mu, sig;
-    KernelOptimizer<float, WINDOW, NODES>::weightedMeanSigma(&mu, &sig, activations, prediction);
-    std::cerr << "MU.: " << mu << std::endl
-              << "SIG: " << sig << std::endl;
 
     return 0;
 }
