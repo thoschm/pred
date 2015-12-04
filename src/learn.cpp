@@ -16,7 +16,7 @@ using namespace Predictor;
 #define BREAK_ERROR 0.01f
 #define BREAK_LOOPS 5000u
 
-#define TSIGMA 10.0f
+#define TSIGMA 100.0f
 #define KRNL_MIN  -.5f
 #define KRNL_MAX  1.5f
 #define KRNL_STEP 0.01f

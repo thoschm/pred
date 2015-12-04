@@ -1,7 +1,7 @@
 
 
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS
-#include <CL/cl.hpp>
+#include <CL/cl.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -30,32 +30,259 @@ struct Particle
 // PSO class
 /////////////////////////////////
 template <typename NumericalType, int Dim>
-class PSO
+class PSOCL
 {
-    PSO(const PSO &other);
-    PSO &operator=(const PSO &other);
+    PSOCL(const PSOCL &other);
+    PSOCL &operator=(const PSOCL &other);
 
 public:
     // alloc particles
-    PSO(const uint particleCount,
-        NumericalType (*scoreFunction)(const NumericalType *, const uint, const void *),
-        const void *payload) :
-        mParticleCount(particleCount),
-        mParticles(NULL),
-        scoreFunc(scoreFunction),
-        mPayload(payload),
-        mW((NumericalType)0.0),
-        mCP((NumericalType)0.0),
-        mCG((NumericalType)0.0),
-        mBestScore((NumericalType)FLT_MAX)
+    PSOCL(const uint particleCount,
+          const NumericalType targetValue,
+          const NumericalType targetSigma,
+          const NumericalType targetAhead,
+          const NumericalType minSigma,
+          const NumericalType *data,
+          const uint dataSize) :
+          mParticleCount(particleCount),
+          mParticles(NULL),
+          mW((NumericalType)0.0),
+          mCP((NumericalType)0.0),
+          mCG((NumericalType)0.0),
+          mBestScore((NumericalType)FLT_MAX)
     {
+        // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(NumericalType));
         mParticles = new Particle<NumericalType, Dim>[particleCount];
+
+        // init opencl platform and device
+        int err;
+        cl_device_id device_id;
+        cl_context context;
+        cl_command_queue commands;
+        cl_program program;
+        cl_kernel kernel;
+        cl_mem params, dbuf, part;
+        cl_mem output;
+
+        err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed to get device id!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+        if (!context)
+        {
+            std::cerr << "failed to create opencl context!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        commands = clCreateCommandQueue(context, device_id, 0, &err);
+        if (!commands)
+        {
+            std::cerr << "failed to create queue!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        std::ifstream cl_file("pso.cl");
+        std::string cl_string(std::istreambuf_iterator<char>(cl_file), std::istreambuf_iterator<char>());
+        cl_file.close();
+        program = clCreateProgramWithSource(context, 1, (const char **) &(cl_string.c_str()), NULL, &err);
+        if (!program)
+        {
+            std::cerr << "loading kernel failed!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        err = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            size_t len;
+            char buffer[2048];
+            std::cerr << "failed to build kernel!\n";
+            clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+            std::cerr << buffer << std::endl;
+            exit(EXIT_FAILURE);
+        }
+
+        kernel = clCreateKernel(program, "pso", &err);
+        if (!kernel || err != CL_SUCCESS)
+        {
+            std::cerr << "failed load kernel function!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        NumericalType p[5];
+        p[0] = targetValue;
+        p[1] = targetSigma;
+        p[2] = targetAhead;
+        p[3] = minSigma;
+        p[4] = dataSize;
+        params = clCreateBuffer(context, CL_MEM_READ_ONLY, 5u * sizeof(NumericalType), NULL, NULL);
+        dbuf   = clCreateBuffer(context, CL_MEM_READ_ONLY, dataSize * sizeof(NumericalType), NULL, NULL);
+
+
+//part   = clCreateBuffer(context, CL_MEM_READ_ONLY, dataSize * sizeof(NumericalType), NULL, NULL);
+        if (!params || !dbuf)
+        {
+            std::cerr << "failed to allocate device memory!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        err = clEnqueueWriteBuffer(commands, params, CL_TRUE, 0, 5u * sizeof(NumericalType), p, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed write params!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        err = clEnqueueWriteBuffer(commands, dbuf, CL_TRUE, 0, dataSize * sizeof(NumericalType), data, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed write input sequence to device!\n";
+            exit(EXIT_FAILURE);
+        }
+/*
+
+        err = 0;
+
+        err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input);
+
+        err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &output);
+
+        err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &count);
+
+        if (err != CL_SUCCESS)
+
+        {
+
+            printf("Error: Failed to set kernel arguments! %d\n", err);
+
+            exit(1);
+
+        }
+
+
+
+        // Get the maximum work group size for executing the kernel on the device
+
+        //
+
+        err = clGetKernelWorkGroupInfo(kernel, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(local), &local, NULL);
+
+        if (err != CL_SUCCESS)
+
+        {
+
+            printf("Error: Failed to retrieve kernel work group info! %d\n", err);
+
+            exit(1);
+
+        }
+
+
+
+        // Execute the kernel over the entire range of our 1d input data set
+
+        // using the maximum number of work group items for this device
+
+        //
+
+        global = count;
+
+        err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
+
+        if (err)
+
+        {
+
+            printf("Error: Failed to execute kernel!\n");
+
+            return EXIT_FAILURE;
+
+        }
+
+
+
+        // Wait for the command commands to get serviced before reading back results
+
+        //
+
+        clFinish(commands);
+
+
+
+        // Read back the results from the device to verify the output
+
+        //
+
+        err = clEnqueueReadBuffer( commands, output, CL_TRUE, 0, sizeof(float) * count, results, 0, NULL, NULL );
+
+        if (err != CL_SUCCESS)
+
+        {
+
+            printf("Error: Failed to read output array! %d\n", err);
+
+            exit(1);
+
+        }
+
+
+
+        // Validate our results
+
+        //
+
+        correct = 0;
+
+        for(i = 0; i < count; i++)
+
+        {
+
+            if(results[i] == data[i] * data[i])
+
+                correct++;
+
+        }
+
+
+
+        // Print a brief summary detailing the results
+
+        //
+
+        printf("Computed '%d/%d' correct values!\n", correct, count);
+
+
+
+        // Shutdown and cleanup
+
+        //
+
+        clReleaseMemObject(input);
+
+        clReleaseMemObject(output);
+
+        clReleaseProgram(program);
+
+        clReleaseKernel(kernel);
+
+        clReleaseCommandQueue(commands);
+
+        clReleaseContext(context);
+
+*/
     }
 
     // release particles
-    ~PSO()
+    ~PSOCL()
     {
+
+
+        // delete particles
         delete[] mParticles;
     }
 
@@ -104,7 +331,7 @@ public:
             Particle<NumericalType, Dim> &par = mParticles[i];
 
             // compute cost
-            par.tmp = scoreFunc(par.x, Dim, mPayload);
+            //par.tmp = scoreFunc(par.x, Dim, mPayload);
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
@@ -202,8 +429,6 @@ public:
 protected:
     uint mParticleCount;
     Particle<NumericalType, Dim> *mParticles;
-    NumericalType (*scoreFunc)(const NumericalType *, const uint, const void *);
-    const void *mPayload;
     XorShift<NumericalType> mRnd;
 
     // Params
@@ -214,6 +439,9 @@ protected:
     // Swarm
     NumericalType mBestPos[Dim],
                   mBestScore;
+
+    // opencl stuff
+
 };
 
 
@@ -221,58 +449,72 @@ protected:
 
 int main(int argc, char **argv)
 {
-    std::vector<cl::Platform> platforms;
+   /* std::vector<cl::Platform> platforms;
     std::vector<cl::Device> devices;
     std::vector<cl::Kernel> kernels;
 
 
-/*
-    // create platform
-    cl::Platform::get(&platforms);
-    platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
+    try
+    {
+        // create platform
+        cl::Platform::get(&platforms);
+        platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
 
-    // create context
-    cl::Context context(devices);
+        // create context
+        cl::Context context(devices);
 
-    // create command queue
-    cl::CommandQueue queue(context, devices[0]);
+        // create command queue
+        cl::CommandQueue queue(context, devices[0]);
 
-    // load opencl source
-    std::ifstream cl_file("opencl_hello_world.cl");
-    std::string cl_string(std::istreambuf_iterator<char>(cl_file), (std::istreambuf_iterator<char>()));
-    cl::Program::Sources source(1, std::make_pair(cl_string.c_str(),
-        cl_string.length() + 1));
+        // load opencl source
+        std::ifstream cl_file("kernel.cl");
+        std::string cl_string(std::istreambuf_iterator<char>(cl_file), (std::istreambuf_iterator<char>()));
+        cl::Program::Sources source(1, std::make_pair(cl_string.c_str(),
+            cl_string.length() + 1));
 
-    // create program
-    cl::Program program(context, source);
+        // create program
+        cl::Program program(context, source);
 
-    // compile opencl source
-    program.build(devices);
+        // compile opencl source
+        program.build(devices);
 
-    // load named kernel from opencl source
-    cl::Kernel kernel(program, "hello_world");
+        // load named kernel from opencl source
+        cl::Kernel kernel(program, "hello_world");
 
-    // create a message to send to kernel
-    char* message = "Hello World!";
-    int messageSize = 12;
+        // create a message to send to kernel
+        const uint size = 10000u;
+        uint a = 1u,
+             b = 2u;
+        float c[size];
 
-    // allocate device buffer to hold message
-    cl::Buffer buffer(CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR,
-        sizeof(char) * messageSize, message);
+        // allocate device buffer to hold message
+        cl::Buffer buffer1(context, CL_MEM_READ_ONLY, sizeof(uint));
+        cl::Buffer buffer2(context, CL_MEM_READ_ONLY, sizeof(uint));
+        cl::Buffer buffer3(context, CL_MEM_WRITE_ONLY, size * sizeof(float));
 
-    // set message as kernel argument
-    kernel.setArg(0, buffer);
-    kernel.setArg(1, sizeof(int), &messageSize);
+        queue.enqueueWriteBuffer(buffer1, CL_TRUE, 0, sizeof(uint), &a);
+        queue.enqueueWriteBuffer(buffer2, CL_TRUE, 0, sizeof(uint), &b);
 
-    // execute kernel
-    queue.enqueueTask(kernel);
+        // set message as kernel argument
+        kernel.setArg(0, buffer1);
+        kernel.setArg(1, buffer2);
+        kernel.setArg(2, buffer3);
 
-    // wait for completion
-    queue.finish();
+        // execute kernel
+        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(size));
 
-    std::cout << std::endl;
+        queue.enqueueReadBuffer(buffer3, CL_TRUE, 0, size * sizeof(float), &c);
 
+        // wait for completion
+        queue.finish();
 
+        std::cout << c[0] << std::endl;
+    }
+    catch (cl::Error er)
+    {
+        printf("ERROR: %s(%d)\n", er.what(), er.err());
+    }
 */
+
     return 0;
 }
