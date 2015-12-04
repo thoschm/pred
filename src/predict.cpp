@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     }
 
     // load input sequence
-    std::vector<float> indata, outdata;
+    std::vector<float> indata, outdata, errdata;
     if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
@@ -78,24 +78,41 @@ int main(int argc, char **argv)
     std::vector<float> activations, prediction;
     const uint size = indata.size() - WINDOW;
     outdata.resize(indata.size() + LOOK_AHEAD, 0.0f);
+    errdata.resize(indata.size() + LOOK_AHEAD, 0.0f);
     for (uint i = 0; i <= size; ++i)
     {
         KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, i);
-        float mf = -1.0f;
-        uint idx = 0;
+        float mf1 = -1.0f, mf2 = -1.0f;
+        uint idx1 = 0;
         for (uint k = 0; k < activations.size(); ++k)
         {
-            if (activations[k] > mf)
+            if (activations[k] > mf1)
             {
-                mf = activations[k];
-                idx = k;
+                mf1 = activations[k];
+                idx1 = k;
             }
         }
-        outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx];
+        for (uint k = 0; k < activations.size(); ++k)
+        {
+            if (k == idx1) continue;
+            if (activations[k] > mf2)
+            {
+                mf2 = activations[k];
+            }
+        }
+        if (mf1 >= 1.0f * mf2)
+        {
+            outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx1];
+            if (i + WINDOW + LOOK_AHEAD - 1 < indata.size())
+            {
+                errdata[i + WINDOW + LOOK_AHEAD - 1] = std::fabs(prediction[idx1] - indata[i + WINDOW + LOOK_AHEAD - 1]);
+            }
+        }
     }
 
     // write
     dumpSequence(outdata, "pred.txt");
+    dumpSequence(errdata, "err.txt");
 
     return 0;
 }

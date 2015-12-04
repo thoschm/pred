@@ -219,38 +219,35 @@ protected:
 
 
 
-
-
-
-
 int main(int argc, char **argv)
 {
-    /*std::vector<cl::Platform> pl;
-    std::vector<cl::Device> dev;
-    cl::Platform::get(&pl);
-    if (pl.size() == 0)
-    {
-        std::cerr << "no platforms\n";
-        return -1;
-    }
-    pl[0].getDevices(CL_DEVICE_TYPE_GPU, &dev);
-    if (dev.size() == 0)
-    {
-        std::cerr << "no devices\n";
-        return -1;
-    }
+    std::vector<cl::Platform> platforms;
+    std::vector<cl::Device> devices;
+    std::vector<cl::Kernel> kernels;
+
+
+/*
+    // create platform
+    cl::Platform::get(&platforms);
+    platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
 
     // create context
-    cl::Context context(dev);
+    cl::Context context(devices);
 
     // create command queue
-    cl::CommandQueue queue(context, dev[0]);
+    cl::CommandQueue queue(context, devices[0]);
+
+    // load opencl source
+    std::ifstream cl_file("opencl_hello_world.cl");
+    std::string cl_string(std::istreambuf_iterator<char>(cl_file), (std::istreambuf_iterator<char>()));
+    cl::Program::Sources source(1, std::make_pair(cl_string.c_str(),
+        cl_string.length() + 1));
 
     // create program
     cl::Program program(context, source);
 
     // compile opencl source
-    program.build(dev);
+    program.build(devices);
 
     // load named kernel from opencl source
     cl::Kernel kernel(program, "hello_world");
@@ -272,6 +269,10 @@ int main(int argc, char **argv)
 
     // wait for completion
     queue.finish();
+
+    std::cout << std::endl;
+
+
 */
     return 0;
 }
