@@ -8,9 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 500u
+#define WINDOW 100u
 #define NODES  2u
-#define LOOK_AHEAD 123u
+#define LOOK_AHEAD 50u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.001f
@@ -80,7 +80,7 @@ int main(int argc, char **argv)
 
     for (uint i = 0; i < 2000u; ++i)
     {
-        indata.push_back(std::sin(0.1 * i));
+        indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)));
     }
 
     dumpSequence(indata, "sine.txt");

@@ -8,9 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 500u
+#define WINDOW 100u
 #define NODES  2u
-#define LOOK_AHEAD 123u
+#define LOOK_AHEAD 50u
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -81,8 +81,8 @@ int main(int argc, char **argv)
     for (uint i = 0; i <= size; ++i)
     {
         KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, i);
-        float mf = 0.0f;
-        uint idx;
+        float mf = -1.0f;
+        uint idx = 0;
         for (uint k = 0; k < activations.size(); ++k)
         {
             if (activations[k] > mf)
