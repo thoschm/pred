@@ -1,0 +1,4 @@
+__kernel void pso(__constant float *a, __constant float *b)
+{
+	printf("this is %i\n", get_global_id(0));
+}

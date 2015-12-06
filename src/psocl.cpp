@@ -1,12 +1,13 @@
 
 
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS
-#include <CL/cl.h>
+#include <OpenCL/opencl.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include "XorShift.h"
 #include <float.h>
+#include <string.h>
 
 
 using namespace Predictor;
@@ -15,21 +16,21 @@ using namespace Predictor;
 /////////////////////////////////
 // Particle
 /////////////////////////////////
-template <typename NumericalType, int Dim>
+template <int Dim>
 struct Particle
 {
-    NumericalType x[Dim],
-                  v[Dim],
-                  best[Dim],
-                  score,
-                  tmp;
+    float x[Dim],
+          v[Dim],
+          best[Dim],
+          score,
+          tmp;
 };
 
 
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-template <typename NumericalType, int Dim>
+template <int Dim>
 class PSOCL
 {
     PSOCL(const PSOCL &other);
@@ -38,33 +39,33 @@ class PSOCL
 public:
     // alloc particles
     PSOCL(const uint particleCount,
-          const NumericalType targetValue,
-          const NumericalType targetSigma,
-          const NumericalType targetAhead,
-          const NumericalType minSigma,
-          const NumericalType *data,
+          const float targetValue,
+          const float targetSigma,
+          const uint  targetAhead,
+          const float minSigma,
+          const float *data,
           const uint dataSize) :
           mParticleCount(particleCount),
           mParticles(NULL),
-          mW((NumericalType)0.0),
-          mCP((NumericalType)0.0),
-          mCG((NumericalType)0.0),
-          mBestScore((NumericalType)FLT_MAX)
+          mW(0.0f),
+          mCP(0.0f),
+          mCG(0.0f),
+          mBestScore(FLT_MAX)
     {
         // reset best pos and create particles
-        memset(mBestPos, 0, Dim * sizeof(NumericalType));
-        mParticles = new Particle<NumericalType, Dim>[particleCount];
+        memset(mBestPos, 0, Dim * sizeof(float));
+        mParticles = new Particle<Dim>[particleCount];
 
         // init opencl platform and device
         int err;
         cl_device_id device_id;
-        cl_context context;
-        cl_command_queue commands;
-        cl_program program;
-        cl_kernel kernel;
-        cl_mem params, dbuf, part;
-        cl_mem output;
 
+        size_t workGroupSize,
+               kernelWSize;
+        char devName[100];
+        cl_uint units;
+
+        // get device
         err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
         if (err != CL_SUCCESS)
         {
@@ -72,116 +73,113 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        context = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
-        if (!context)
+        // print some info about gpu
+        clGetDeviceInfo(device_id, CL_DEVICE_NAME, 100 * sizeof(char), devName, NULL);
+        clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, NULL);
+        clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &units, NULL);
+        std::cerr << "selected device: " << devName << std::endl;
+        std::cerr << "work group size: " << workGroupSize << std::endl;
+        std::cerr << "computing units: " << units << std::endl;
+
+        // context
+        mCtx = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+        if (!mCtx)
         {
             std::cerr << "failed to create opencl context!\n";
             exit(EXIT_FAILURE);
         }
 
-        commands = clCreateCommandQueue(context, device_id, 0, &err);
-        if (!commands)
+        // Q
+        mCmd = clCreateCommandQueue(mCtx, device_id, 0, &err);
+        if (!mCmd)
         {
             std::cerr << "failed to create queue!\n";
             exit(EXIT_FAILURE);
         }
 
-        std::ifstream cl_file("pso.cl");
-        std::string cl_string(std::istreambuf_iterator<char>(cl_file), std::istreambuf_iterator<char>());
-        cl_file.close();
-        program = clCreateProgramWithSource(context, 1, (const char **) &(cl_string.c_str()), NULL, &err);
-        if (!program)
+        // read kernel from file
+        std::ifstream ifs;
+        ifs.open("kernel", std::ios::in);
+        std::string infile;
+        infile.assign((std::istreambuf_iterator<char>(ifs)),
+                       std::istreambuf_iterator<char>());
+        ifs.close();
+        const char *cptr = infile.c_str();
+        mProg = clCreateProgramWithSource(mCtx, 1, (const char **)&cptr, NULL, &err);
+        if (!mProg)
         {
             std::cerr << "loading kernel failed!\n";
             exit(EXIT_FAILURE);
         }
 
-        err = clBuildProgram(program, 1, &device_id, NULL, NULL, NULL);
+        // build kernel
+        err = clBuildProgram(mProg, 1, &device_id, NULL, NULL, NULL);
         if (err != CL_SUCCESS)
         {
             size_t len;
             char buffer[2048];
             std::cerr << "failed to build kernel!\n";
-            clGetProgramBuildInfo(program, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
+            clGetProgramBuildInfo(mProg, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
             std::cerr << buffer << std::endl;
             exit(EXIT_FAILURE);
         }
 
-        kernel = clCreateKernel(program, "pso", &err);
-        if (!kernel || err != CL_SUCCESS)
+        // create actual kernel function
+        mKrnl = clCreateKernel(mProg, "pso", &err);
+        if (!mKrnl|| err != CL_SUCCESS)
         {
             std::cerr << "failed load kernel function!\n";
             exit(EXIT_FAILURE);
         }
 
-        NumericalType p[5];
+        // create buffers
+        float p[5];
         p[0] = targetValue;
         p[1] = targetSigma;
         p[2] = targetAhead;
         p[3] = minSigma;
         p[4] = dataSize;
-        params = clCreateBuffer(context, CL_MEM_READ_ONLY, 5u * sizeof(NumericalType), NULL, NULL);
-        dbuf   = clCreateBuffer(context, CL_MEM_READ_ONLY, dataSize * sizeof(NumericalType), NULL, NULL);
-
-
-//part   = clCreateBuffer(context, CL_MEM_READ_ONLY, dataSize * sizeof(NumericalType), NULL, NULL);
-        if (!params || !dbuf)
+        mParams = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, 5u * sizeof(float), NULL, NULL);
+        mData   = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
+        if (!mParams || !mData)
         {
             std::cerr << "failed to allocate device memory!\n";
             exit(EXIT_FAILURE);
         }
 
-        err = clEnqueueWriteBuffer(commands, params, CL_TRUE, 0, 5u * sizeof(NumericalType), p, 0, NULL, NULL);
+        // write constant data to device
+        err = clEnqueueWriteBuffer(mCmd, mParams, CL_TRUE, 0, 5u * sizeof(float), p, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
-            std::cerr << "failed write params!\n";
+            std::cerr << "failed to write params!\n";
             exit(EXIT_FAILURE);
         }
 
-        err = clEnqueueWriteBuffer(commands, dbuf, CL_TRUE, 0, dataSize * sizeof(NumericalType), data, 0, NULL, NULL);
+        err = clEnqueueWriteBuffer(mCmd, mData, CL_TRUE, 0, dataSize * sizeof(float), data, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
-            std::cerr << "failed write input sequence to device!\n";
+            std::cerr << "failed to write input sequence to device!\n";
             exit(EXIT_FAILURE);
         }
-/*
 
+        // set kernel arguments
         err = 0;
-
-        err  = clSetKernelArg(kernel, 0, sizeof(cl_mem), &input);
-
-        err |= clSetKernelArg(kernel, 1, sizeof(cl_mem), &output);
-
-        err |= clSetKernelArg(kernel, 2, sizeof(unsigned int), &count);
-
+        err = clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParams);
+        err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mData);
         if (err != CL_SUCCESS)
-
         {
-
-            printf("Error: Failed to set kernel arguments! %d\n", err);
-
-            exit(1);
-
+            std::cerr << "failed to set kernel arguments!\n";
+            exit(EXIT_FAILURE);
         }
-
-
 
         // Get the maximum work group size for executing the kernel on the device
-
-        //
-
-        err = clGetKernelWorkGroupInfo(kernel, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(local), &local, NULL);
-
+        err = clGetKernelWorkGroupInfo(mKrnl, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWSize, NULL);
         if (err != CL_SUCCESS)
-
         {
-
-            printf("Error: Failed to retrieve kernel work group info! %d\n", err);
-
-            exit(1);
-
+            std::cerr << "failed to get kernel max worksize!\n";
+            exit(EXIT_FAILURE);
         }
-
+        std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
 
 
         // Execute the kernel over the entire range of our 1d input data set
@@ -189,7 +187,7 @@ public:
         // using the maximum number of work group items for this device
 
         //
-
+/*
         global = count;
 
         err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
@@ -262,17 +260,7 @@ public:
 
         //
 
-        clReleaseMemObject(input);
 
-        clReleaseMemObject(output);
-
-        clReleaseProgram(program);
-
-        clReleaseKernel(kernel);
-
-        clReleaseCommandQueue(commands);
-
-        clReleaseContext(context);
 
 */
     }
@@ -280,55 +268,60 @@ public:
     // release particles
     ~PSOCL()
     {
-
+        clReleaseMemObject(mData);
+        clReleaseMemObject(mParams);
+        clReleaseProgram(mProg);
+        clReleaseKernel(mKrnl);
+        clReleaseCommandQueue(mCmd);
+        clReleaseContext(mCtx);
 
         // delete particles
         delete[] mParticles;
     }
 
     // init
-    void init(const NumericalType lowerLimit,
-              const NumericalType upperLimit,
-              const NumericalType w  = (NumericalType)0.7,
-              const NumericalType cp = (NumericalType)1.4,
-              const NumericalType cg = (NumericalType)1.4)
+    void init(const float lowerLimit,
+              const float upperLimit,
+              const float w  = 0.7f,
+              const float cp = 1.4f,
+              const float cg = 1.4f)
     {
         // params
         mW = w;
         mCP = cp;
         mCG = cg;
-        const NumericalType diff = upperLimit - lowerLimit;
+        const float diff = upperLimit - lowerLimit;
 
         // init particles
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
-            par.score = (NumericalType)FLT_MAX;
-            par.tmp = (NumericalType)FLT_MAX;
+            Particle<Dim> &par = mParticles[i];
+            par.score = FLT_MAX;
+            par.tmp = FLT_MAX;
 
             // init
             for (uint d = 0; d < Dim; ++d)
             {
                 // x, v, best
                 par.x[d] = mRnd.uniform() * diff + lowerLimit;
-                par.v[d] = mRnd.uniform() * (NumericalType)2.0 * diff - diff;
+                par.v[d] = mRnd.uniform() * 2.0f * diff - diff;
                 par.best[d] = mRnd.uniform() * diff + lowerLimit;
             }
         }
 
         // reset swarm
-        mBestScore = (NumericalType)FLT_MAX;
-        memset(mBestPos, 0, Dim * sizeof(NumericalType));
+        mBestScore = FLT_MAX;
+        memset(mBestPos, 0, Dim * sizeof(float));
     }
 
     // one optimization step
-    NumericalType step()
+    float step()
     {
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
+            Particle<Dim> &par = mParticles[i];
 
             // compute cost
             //par.tmp = scoreFunc(par.x, Dim, mPayload);
@@ -337,19 +330,19 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<NumericalType, Dim> &par = mParticles[i];
+            Particle<Dim> &par = mParticles[i];
 
             // update scores
             if (par.tmp < par.score)
             {
                 par.score = par.tmp;
-                memcpy(par.best, par.x, Dim * sizeof(NumericalType));
+                memcpy(par.best, par.x, Dim * sizeof(float));
 
                 // swarm
                 if (par.tmp < mBestScore)
                 {
                     mBestScore = par.tmp;
-                    memcpy(mBestPos, par.x, Dim * sizeof(NumericalType));
+                    memcpy(mBestPos, par.x, Dim * sizeof(float));
                 }
             }
 
@@ -357,8 +350,8 @@ public:
             for (uint d = 0; d < Dim; ++d)
             {
                 // uniform random values
-                const NumericalType rp = mRnd.uniform(),
-                                    rg = mRnd.uniform();
+                const float rp = mRnd.uniform(),
+                            rg = mRnd.uniform();
                 // update velocity and pos
                 par.v[d] = mW * par.v[d] +
                            mCP * rp * (par.best[d] - par.x[d]) +
@@ -370,18 +363,18 @@ public:
     }
 
     // get particle pointer
-    const Particle<NumericalType, Dim> *getParticles()
+    const Particle<Dim> *getParticles()
     {
         return mParticles;
     }
 
     // get current best
-    const NumericalType *getBest()
+    const float *getBest()
     {
         return mBestPos;
     }
 
-    NumericalType getScore()
+    float getScore()
     {
         return mBestScore;
     }
@@ -399,7 +392,7 @@ public:
         std::cerr << "particles.: " << std::endl;
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<NumericalType, Dim> &par = mParticles[i];
+            const Particle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
                 std::cerr << par.x[d] << " ";
@@ -416,7 +409,7 @@ public:
         of.open(file, std::ios::out);
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<NumericalType, Dim> &par = mParticles[i];
+            const Particle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
                 of << par.x[d] << " ";
@@ -428,20 +421,25 @@ public:
 
 protected:
     uint mParticleCount;
-    Particle<NumericalType, Dim> *mParticles;
-    XorShift<NumericalType> mRnd;
+    Particle<Dim> *mParticles;
+    XorShift<float> mRnd;
 
     // Params
-    NumericalType mW,  // velocity inertia weight
-                  mCP, // personal best weight
-                  mCG; // group best weight
+    float mW,  // velocity inertia weight
+          mCP, // personal best weight
+          mCG; // group best weight
 
     // Swarm
-    NumericalType mBestPos[Dim],
-                  mBestScore;
+    float mBestPos[Dim],
+          mBestScore;
 
     // opencl stuff
-
+    cl_context mCtx;
+    cl_command_queue mCmd;
+    cl_program mProg;
+    cl_kernel mKrnl;
+    cl_mem mParams,
+           mData;
 };
 
 
@@ -449,72 +447,13 @@ protected:
 
 int main(int argc, char **argv)
 {
-   /* std::vector<cl::Platform> platforms;
-    std::vector<cl::Device> devices;
-    std::vector<cl::Kernel> kernels;
+    std::vector<float> indata;
 
 
-    try
+    for (uint i = 0; i < 2000u; ++i)
     {
-        // create platform
-        cl::Platform::get(&platforms);
-        platforms[0].getDevices(CL_DEVICE_TYPE_GPU, &devices);
-
-        // create context
-        cl::Context context(devices);
-
-        // create command queue
-        cl::CommandQueue queue(context, devices[0]);
-
-        // load opencl source
-        std::ifstream cl_file("kernel.cl");
-        std::string cl_string(std::istreambuf_iterator<char>(cl_file), (std::istreambuf_iterator<char>()));
-        cl::Program::Sources source(1, std::make_pair(cl_string.c_str(),
-            cl_string.length() + 1));
-
-        // create program
-        cl::Program program(context, source);
-
-        // compile opencl source
-        program.build(devices);
-
-        // load named kernel from opencl source
-        cl::Kernel kernel(program, "hello_world");
-
-        // create a message to send to kernel
-        const uint size = 10000u;
-        uint a = 1u,
-             b = 2u;
-        float c[size];
-
-        // allocate device buffer to hold message
-        cl::Buffer buffer1(context, CL_MEM_READ_ONLY, sizeof(uint));
-        cl::Buffer buffer2(context, CL_MEM_READ_ONLY, sizeof(uint));
-        cl::Buffer buffer3(context, CL_MEM_WRITE_ONLY, size * sizeof(float));
-
-        queue.enqueueWriteBuffer(buffer1, CL_TRUE, 0, sizeof(uint), &a);
-        queue.enqueueWriteBuffer(buffer2, CL_TRUE, 0, sizeof(uint), &b);
-
-        // set message as kernel argument
-        kernel.setArg(0, buffer1);
-        kernel.setArg(1, buffer2);
-        kernel.setArg(2, buffer3);
-
-        // execute kernel
-        queue.enqueueNDRangeKernel(kernel, cl::NDRange(0), cl::NDRange(size));
-
-        queue.enqueueReadBuffer(buffer3, CL_TRUE, 0, size * sizeof(float), &c);
-
-        // wait for completion
-        queue.finish();
-
-        std::cout << c[0] << std::endl;
+        indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
-    catch (cl::Error er)
-    {
-        printf("ERROR: %s(%d)\n", er.what(), er.err());
-    }
-*/
 
-    return 0;
+    PSOCL<1> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
 }

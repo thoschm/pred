@@ -29,6 +29,7 @@ namespace Predictor
 /////////////////////////////////
 // WORKER POOL
 /////////////////////////////////
+/*
 class WorkerPool
 {
     WorkerPool(const WorkerPool &other);
@@ -121,7 +122,7 @@ private:
                       mSecond;
     bool mAlive;
 };
-
+*/
 
 /////////////////////////////////
 // Particle
@@ -140,9 +141,9 @@ struct Particle
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-#define PSO_MT
-//#define PSO_OMP
-#define THREADS 4u
+//#define PSO_MT
+#define PSO_OMP
+//#define THREADS 4u
 
 template <typename NumericalType, int Dim>
 class PSO
