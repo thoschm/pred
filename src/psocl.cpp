@@ -30,13 +30,15 @@ struct Particle
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
-template <int Dim>
+template <int Window, int Nodes>
 class PSOCL
 {
     PSOCL(const PSOCL &other);
     PSOCL &operator=(const PSOCL &other);
 
 public:
+    enum { Dim = 3 * Nodes * Window };
+
     // alloc particles
     PSOCL(const uint particleCount,
           const float targetValue,
@@ -59,11 +61,11 @@ public:
         // init opencl platform and device
         int err;
         cl_device_id device_id;
-
         size_t workGroupSize,
                kernelWSize;
         char devName[100];
-        cl_uint units;
+        cl_uint units,
+                width;
 
         // get device
         err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
@@ -77,9 +79,11 @@ public:
         clGetDeviceInfo(device_id, CL_DEVICE_NAME, 100 * sizeof(char), devName, NULL);
         clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, NULL);
         clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &units, NULL);
+        clGetDeviceInfo(device_id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint), &width, NULL);
         std::cerr << "selected device: " << devName << std::endl;
         std::cerr << "work group size: " << workGroupSize << std::endl;
         std::cerr << "computing units: " << units << std::endl;
+        std::cerr << "float vector wi: " << width << std::endl;
 
         // context
         mCtx = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
@@ -141,7 +145,9 @@ public:
         p[4] = dataSize;
         mParams = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, 5u * sizeof(float), NULL, NULL);
         mData   = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
-        if (!mParams || !mData)
+        mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, (dataSize - Window) * sizeof(float), NULL, NULL);
+        if (!mParams || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
             exit(EXIT_FAILURE);
@@ -180,7 +186,7 @@ public:
             exit(EXIT_FAILURE);
         }
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
-
+        mWorkSize = kernelWSize;
 
         // Execute the kernel over the entire range of our 1d input data set
 
@@ -230,35 +236,7 @@ public:
 
 
 
-        // Validate our results
 
-        //
-
-        correct = 0;
-
-        for(i = 0; i < count; i++)
-
-        {
-
-            if(results[i] == data[i] * data[i])
-
-                correct++;
-
-        }
-
-
-
-        // Print a brief summary detailing the results
-
-        //
-
-        printf("Computed '%d/%d' correct values!\n", correct, count);
-
-
-
-        // Shutdown and cleanup
-
-        //
 
 
 
@@ -268,6 +246,8 @@ public:
     // release particles
     ~PSOCL()
     {
+        clReleaseMemObject(mResult);
+        clReleaseMemObject(mParticle);
         clReleaseMemObject(mData);
         clReleaseMemObject(mParams);
         clReleaseProgram(mProg);
@@ -439,7 +419,10 @@ protected:
     cl_program mProg;
     cl_kernel mKrnl;
     cl_mem mParams,
-           mData;
+           mData,
+           mResult,
+           mParticle;
+    uint mWorkSize;
 };
 
 
@@ -455,5 +438,5 @@ int main(int argc, char **argv)
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
-    PSOCL<1> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
+    PSOCL<10, 1> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
 }
