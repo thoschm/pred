@@ -8,6 +8,7 @@
 #include "XorShift.h"
 #include <float.h>
 #include <string.h>
+#include <assert.h>
 
 
 using namespace Predictor;
@@ -54,6 +55,10 @@ public:
           mCG(0.0f),
           mBestScore(FLT_MAX)
     {
+        // check used types
+        assert(sizeof(float) == sizeof(cl_float));
+        assert(sizeof(uint) == sizeof(cl_uint));
+
         // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(float));
         mParticles = new Particle<Dim>[particleCount];
@@ -137,25 +142,28 @@ public:
         }
 
         // create buffers
-        float p[5];
-        p[0] = targetValue;
-        p[1] = targetSigma;
-        p[2] = targetAhead;
-        p[3] = minSigma;
-        p[4] = dataSize;
         mDataNoWindow = dataSize - Window;
-        mParams = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, 5u * sizeof(float), NULL, NULL);
-        mData   = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
+        float pf[3];
+        pf[0] = targetValue;
+        pf[1] = targetSigma;
+        pf[2] = minSigma;
+        uint pi[2];
+        pi[0] = targetAhead;
+        pi[1] = mDataNoWindow;
+        mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
+        mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
+        mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
         mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mDataNoWindow * sizeof(float), NULL, NULL);
-        if (!mParams || !mData || !mParticle || !mResult)
+        if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
             exit(EXIT_FAILURE);
         }
 
         // write constant data to device
-        err = clEnqueueWriteBuffer(mCmd, mParams, CL_TRUE, 0, 5u * sizeof(float), p, 0, NULL, NULL);
+        err = clEnqueueWriteBuffer(mCmd, mParamsf, CL_TRUE, 0, sizeof(pf), pf, 0, NULL, NULL);
+        err |= clEnqueueWriteBuffer(mCmd, mParamsi, CL_TRUE, 0, sizeof(pi), pi, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to write params!\n";
@@ -171,10 +179,11 @@ public:
 
         // set kernel arguments
         err = 0;
-        err |= clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParams);
-        err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mData);
-        err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mParticle);
-        err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mResult);
+        err |= clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParamsf);
+        err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mParamsi);
+        err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mData);
+        err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mParticle);
+        err |= clSetKernelArg(mKrnl, 4, sizeof(cl_mem), &mResult);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
@@ -191,63 +200,11 @@ public:
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
 
+        mWorkSize = 32u;
+
         // compute global size
         mGlobalSize = std::ceil(1.0f * mDataNoWindow / mWorkSize) * mWorkSize;
         std::cerr << "global size....: " << mGlobalSize << std::endl;
-
-        // Execute the kernel over the entire range of our 1d input data set
-
-        // using the maximum number of work group items for this device
-
-        //
-/*
-        global = count;
-
-        err = clEnqueueNDRangeKernel(commands, kernel, 1, NULL, &global, &local, 0, NULL, NULL);
-
-        if (err)
-
-        {
-
-            printf("Error: Failed to execute kernel!\n");
-
-            return EXIT_FAILURE;
-
-        }
-
-
-
-        // Wait for the command commands to get serviced before reading back results
-
-        //
-
-        clFinish(commands);
-
-
-
-        // Read back the results from the device to verify the output
-
-        //
-
-        err = clEnqueueReadBuffer( commands, output, CL_TRUE, 0, sizeof(float) * count, results, 0, NULL, NULL );
-
-        if (err != CL_SUCCESS)
-
-        {
-
-            printf("Error: Failed to read output array! %d\n", err);
-
-            exit(1);
-
-        }
-
-
-
-
-
-
-
-*/
     }
 
     // release particles
@@ -256,7 +213,8 @@ public:
         clReleaseMemObject(mResult);
         clReleaseMemObject(mParticle);
         clReleaseMemObject(mData);
-        clReleaseMemObject(mParams);
+        clReleaseMemObject(mParamsf);
+        clReleaseMemObject(mParamsi);
         clReleaseProgram(mProg);
         clReleaseKernel(mKrnl);
         clReleaseCommandQueue(mCmd);
@@ -311,7 +269,7 @@ public:
             Particle<Dim> &par = mParticles[i];
 
             // write current particle
-            int err = clEnqueueWriteBuffer(mCmd, mData, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
+            int err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to write particle to device!\n";
@@ -330,7 +288,17 @@ public:
             clFinish(mCmd);
 
             // read results
-
+            float res[90];
+            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindow * sizeof(float), res, 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                std::cerr << "failed to read results!\n";
+                exit(EXIT_FAILURE);
+            }
+            for (uint r = 0; r < 90; ++r)
+            {
+                std::cerr << res[r] << std::endl;
+            }
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
@@ -444,7 +412,8 @@ protected:
     cl_command_queue mCmd;
     cl_program mProg;
     cl_kernel mKrnl;
-    cl_mem mParams,
+    cl_mem mParamsf,
+           mParamsi,
            mData,
            mResult,
            mParticle;
@@ -461,7 +430,7 @@ int main(int argc, char **argv)
     std::vector<float> indata;
 
 
-    for (uint i = 0; i < 2000u; ++i)
+    for (uint i = 0; i < 100u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
