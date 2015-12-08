@@ -143,10 +143,11 @@ public:
         p[2] = targetAhead;
         p[3] = minSigma;
         p[4] = dataSize;
+        mDataNoWindow = dataSize - Window;
         mParams = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, 5u * sizeof(float), NULL, NULL);
         mData   = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, (dataSize - Window) * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mDataNoWindow * sizeof(float), NULL, NULL);
         if (!mParams || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -170,8 +171,10 @@ public:
 
         // set kernel arguments
         err = 0;
-        err = clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParams);
+        err |= clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParams);
         err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mData);
+        err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mParticle);
+        err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mResult);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
@@ -187,6 +190,10 @@ public:
         }
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
+
+        // compute global size
+        mGlobalSize = std::ceil(1.0f * mDataNoWindow / mWorkSize) * mWorkSize;
+        std::cerr << "global size....: " << mGlobalSize << std::endl;
 
         // Execute the kernel over the entire range of our 1d input data set
 
@@ -303,8 +310,27 @@ public:
             // for each particle
             Particle<Dim> &par = mParticles[i];
 
-            // compute cost
-            //par.tmp = scoreFunc(par.x, Dim, mPayload);
+            // write current particle
+            int err = clEnqueueWriteBuffer(mCmd, mData, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
+            if (err != CL_SUCCESS)
+            {
+                std::cerr << "failed to write particle to device!\n";
+                exit(EXIT_FAILURE);
+            }
+
+            // launch kernel
+            err = clEnqueueNDRangeKernel(mCmd, mKrnl, 1, NULL, &mGlobalSize, &mWorkSize, 0, NULL, NULL);
+            if (err)
+            {
+                std::cerr << "failed to execute kernel!\n";
+                exit(EXIT_FAILURE);
+            }
+
+            // wait finish
+            clFinish(mCmd);
+
+            // read results
+
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
@@ -422,7 +448,9 @@ protected:
            mData,
            mResult,
            mParticle;
-    uint mWorkSize;
+    size_t mWorkSize,
+           mGlobalSize;
+    uint mDataNoWindow;
 };
 
 
@@ -438,5 +466,7 @@ int main(int argc, char **argv)
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
-    PSOCL<10, 1> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
+    PSOCL<10, 1> pso(1u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
+    pso.init(0.0f, 1.0f);
+    pso.step();
 }

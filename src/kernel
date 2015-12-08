@@ -1,4 +1,4 @@
-__kernel void pso(__constant float *a, __constant float *b)
+__kernel void pso(__constant const float *params, __global const float *data, __constant const float *particle, __global float *out)
 {
 	printf("this is %i\n", get_global_id(0));
 }
