@@ -12,7 +12,7 @@ __kernel void pso(__constant const float *paramsf,
 	
 	// params uint
 	const uint targetAhead = paramsi[0];
-	const uint dataNoWindow = paramsi[1];
+	const uint lastItem = paramsi[1];
 	const uint localWindow = paramsi[2];
 	
 	// ids
@@ -20,7 +20,7 @@ __kernel void pso(__constant const float *paramsf,
 	uint lid = get_local_id(0);
 	
 	// correct ids
-	if (gid > dataNoWindow)
+	if (gid > lastItem)
 	{
 		gid = get_group_id(0) * get_local_size(0);
 		lid = 0;

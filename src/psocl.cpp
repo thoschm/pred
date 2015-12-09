@@ -148,17 +148,23 @@ public:
             std::cerr << "failed to get kernel max worksize!\n";
             exit(EXIT_FAILURE);
         }
+
+
+        kernelWSize = 4u;
+
+
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
 
         // compute global size
-        mDataNoWindow = dataSize - Window;
-        mGlobalSize = std::ceil(1.0f * mDataNoWindow / mWorkSize) * mWorkSize;
+        mDataNoWindowSize = dataSize - (Window - 1u) - targetAhead;
+        std::cerr << "items needed...: " << mDataNoWindowSize << std::endl;
+        mGlobalSize = std::ceil(1.0f * mDataNoWindowSize / mWorkSize) * mWorkSize;
         std::cerr << "global size....: " << mGlobalSize << std::endl;
 
         // create buffers
-        const uint localWindow = mWorkSize + Window - 1u + targetAhead;
-        std::cerr << "local window,,,: " << localWindow << std::endl;
+        const uint localWindowSize = mWorkSize + Window - 1u + targetAhead;
+        std::cerr << "local window sz: " << localWindowSize << std::endl;
 
         float pf[3];
         pf[0] = targetValue;
@@ -166,13 +172,13 @@ public:
         pf[2] = minSigma;
         uint pi[3];
         pi[0] = targetAhead;
-        pi[1] = mDataNoWindow;
-        pi[2] = localWindow;
+        pi[1] = mDataNoWindowSize - 1u; // last valid index
+        pi[2] = localWindowSize;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, (mDataNoWindow + 1u) * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mDataNoWindowSize * sizeof(float), NULL, NULL);
         if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -202,7 +208,7 @@ public:
         err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mData);
         err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mParticle);
         err |= clSetKernelArg(mKrnl, 4, sizeof(cl_mem), &mResult);
-        err |= clSetKernelArg(mKrnl, 5, localWindow * sizeof(float), NULL);
+        err |= clSetKernelArg(mKrnl, 5, localWindowSize * sizeof(float), NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
@@ -291,14 +297,14 @@ public:
             clFinish(mCmd);
 
             // read results
-            float *dummy = new float[mDataNoWindow + 1u];
-            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, (mDataNoWindow + 1u) * sizeof(float), dummy, 0, NULL, NULL);
+            float *dummy = new float[mDataNoWindowSize];
+            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindowSize * sizeof(float), dummy, 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to read results!\n";
                 exit(EXIT_FAILURE);
             }
-            for (uint r = 0; r <= mDataNoWindow; ++r)
+            for (uint r = 0; r < mDataNoWindowSize; ++r)
             {
                 std::cerr << dummy[r] << std::endl;
             }
@@ -423,7 +429,7 @@ protected:
            mParticle;
     size_t mWorkSize,
            mGlobalSize;
-    uint mDataNoWindow;
+    uint mDataNoWindowSize;
 };
 
 
@@ -434,12 +440,12 @@ int main(int argc, char **argv)
     std::vector<float> indata;
 
 
-    for (uint i = 0; i < 1000u; ++i)
+    for (uint i = 0; i < 20u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
-    PSOCL<10, 1> pso(1u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
+    PSOCL<2, 1> pso(1u, 1.0f, 1.0f, 1u, 0.0001f, indata.data(), indata.size());
     pso.init(0.0f, 1.0f);
     pso.step();
 }
