@@ -141,20 +141,38 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        // create buffers
+        // Get the maximum work group size for executing the kernel on the device
+        err = clGetKernelWorkGroupInfo(mKrnl, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWSize, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed to get kernel max worksize!\n";
+            exit(EXIT_FAILURE);
+        }
+        std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
+        mWorkSize = kernelWSize;
+
+        // compute global size
         mDataNoWindow = dataSize - Window;
+        mGlobalSize = std::ceil(1.0f * mDataNoWindow / mWorkSize) * mWorkSize;
+        std::cerr << "global size....: " << mGlobalSize << std::endl;
+
+        // create buffers
+        const uint localWindow = mWorkSize + Window - 1u + targetAhead;
+        std::cerr << "local window,,,: " << localWindow << std::endl;
+
         float pf[3];
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[2];
+        uint pi[3];
         pi[0] = targetAhead;
         pi[1] = mDataNoWindow;
+        pi[2] = localWindow;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mDataNoWindow * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, (mDataNoWindow + 1u) * sizeof(float), NULL, NULL);
         if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -184,27 +202,12 @@ public:
         err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mData);
         err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mParticle);
         err |= clSetKernelArg(mKrnl, 4, sizeof(cl_mem), &mResult);
+        err |= clSetKernelArg(mKrnl, 5, localWindow * sizeof(float), NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
             exit(EXIT_FAILURE);
         }
-
-        // Get the maximum work group size for executing the kernel on the device
-        err = clGetKernelWorkGroupInfo(mKrnl, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWSize, NULL);
-        if (err != CL_SUCCESS)
-        {
-            std::cerr << "failed to get kernel max worksize!\n";
-            exit(EXIT_FAILURE);
-        }
-        std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
-        mWorkSize = kernelWSize;
-
-        mWorkSize = 32u;
-
-        // compute global size
-        mGlobalSize = std::ceil(1.0f * mDataNoWindow / mWorkSize) * mWorkSize;
-        std::cerr << "global size....: " << mGlobalSize << std::endl;
     }
 
     // release particles
@@ -288,17 +291,18 @@ public:
             clFinish(mCmd);
 
             // read results
-            float res[90];
-            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindow * sizeof(float), res, 0, NULL, NULL);
+            float *dummy = new float[mDataNoWindow + 1u];
+            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, (mDataNoWindow + 1u) * sizeof(float), dummy, 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to read results!\n";
                 exit(EXIT_FAILURE);
             }
-            for (uint r = 0; r < 90; ++r)
+            for (uint r = 0; r <= mDataNoWindow; ++r)
             {
-                std::cerr << res[r] << std::endl;
+                std::cerr << dummy[r] << std::endl;
             }
+            delete[] dummy;
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
@@ -430,7 +434,7 @@ int main(int argc, char **argv)
     std::vector<float> indata;
 
 
-    for (uint i = 0; i < 100u; ++i)
+    for (uint i = 0; i < 1000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }

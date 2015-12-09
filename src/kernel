@@ -1,4 +1,9 @@
-__kernel void pso(__constant const float *paramsf, __constant const uint *paramsi, __global const float *data, __constant const float *particle, __global float *out)
+__kernel void pso(__constant const float *paramsf, 
+				  __constant const uint *paramsi,
+				  __global const float *data, 
+				  __constant const float *particle, 
+				  __global float *out, 
+				  __local float *tmp)
 {
 	// params float
 	const float targetValue = paramsf[0];
@@ -8,14 +13,24 @@ __kernel void pso(__constant const float *paramsf, __constant const uint *params
 	// params uint
 	const uint targetAhead = paramsi[0];
 	const uint dataNoWindow = paramsi[1];
+	const uint localWindow = paramsi[2];
 	
-	const uint gid = get_global_id(0);
-	const uint lid = get_local_id(0);
-
-	// check boundary
-	if (gid > 1 && gid < dataNoWindow)
+	// ids
+	uint gid = get_global_id(0);
+	uint lid = get_local_id(0);
+	
+	// correct ids
+	if (gid > dataNoWindow)
 	{
-		out[gid] = lid;
-		printf("> %u %u %u\n", lid, get_group_id(0), get_local_size(0));
+		gid = get_group_id(0) * get_local_size(0);
+		lid = 0;
 	}
+	
+	// fill local memory
+	
+	
+	
+	
+	out[gid] = gid;
+	printf("gid=%u, lid=%u, grp=%u\n", gid, lid, get_group_id(0));
 }
