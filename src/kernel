@@ -81,5 +81,5 @@ __kernel void pso(__constant const float *paramsf,
 	out[gid] = err * err;
 	
 	//uint bla = gid + Window + targetAhead - 1u;
-	//printf("min=%f, max=%f, gid=%u, teach=%u, resp=%f, teacher=%f\n", vmin, vmax, gid, bla, sum, teacher); 
+	//printf("min=%f, max=%f, gid=%u, teach=%u, resp=%f, teacher=%f, mu=%f, sig=%f, sca=%f\n", vmin, vmax, gid, bla, sum, teacher, particle[0], fabs(particle[1]) + minSigma, particle[2]); 
 }

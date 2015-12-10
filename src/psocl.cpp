@@ -166,6 +166,9 @@ public:
         const uint localWindowSize = mWorkSize + Window - 1u + targetAhead;
         std::cerr << "local window sz: " << localWindowSize << std::endl;
 
+        // alloc host mem for results
+        mResults = new float[mDataNoWindowSize];
+
         float pf[3];
         pf[0] = targetValue;
         pf[1] = targetSigma;
@@ -221,6 +224,7 @@ public:
     // release particles
     ~PSOCL()
     {
+        // free ocl stuff
         clReleaseMemObject(mResult);
         clReleaseMemObject(mParticle);
         clReleaseMemObject(mData);
@@ -230,6 +234,9 @@ public:
         clReleaseKernel(mKrnl);
         clReleaseCommandQueue(mCmd);
         clReleaseContext(mCtx);
+
+        // delete results mem
+        delete[] mResults;
 
         // delete particles
         delete[] mParticles;
@@ -299,18 +306,20 @@ public:
             clFinish(mCmd);
 
             // read results
-            float *dummy = new float[mDataNoWindowSize];
-            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindowSize * sizeof(float), dummy, 0, NULL, NULL);
+            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindowSize * sizeof(float), mResults, 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to read results!\n";
                 exit(EXIT_FAILURE);
             }
+
+            // compute score
+            float sum = 0.0f;
             for (uint r = 0; r < mDataNoWindowSize; ++r)
             {
-                std::cerr << dummy[r] << std::endl;
+                sum += mResults[r];
             }
-            delete[] dummy;
+            par.tmp = sum / mDataNoWindowSize;
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
@@ -409,6 +418,7 @@ protected:
     uint mParticleCount;
     Particle<Dim> *mParticles;
     XorShift<float> mRnd;
+    float *mResults;
 
     // Params
     float mW,  // velocity inertia weight
@@ -442,12 +452,17 @@ int main(int argc, char **argv)
     std::vector<float> indata;
 
 
-    for (uint i = 0; i < 20000u; ++i)
+    for (uint i = 0; i < 5000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
-    PSOCL<5000, 1> pso(1u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
+    PSOCL<100, 2> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
     pso.init(0.0f, 1.0f);
-    pso.step();
+    float s;
+    while ((s = pso.step()) > 0.001f)
+    {
+        std::cerr << "\roptimization error = " << s;
+    }
+    std::cerr << "\roptimization error = " << s << std::endl;
 }
