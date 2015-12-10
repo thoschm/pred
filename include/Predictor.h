@@ -141,7 +141,7 @@ public:
         {
             for (uint k = 0; k < Nodes; ++k)
             {
-                const uint idx = i * Nodes + k;
+                const uint idx = i * Nodes + k; // counter would suffice
                 sum += gaussian(krnl.data[idx].mu,
                                 krnl.data[idx].sigma,
                                 krnl.data[idx].scale,

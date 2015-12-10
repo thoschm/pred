@@ -124,8 +124,8 @@ public:
         std::ifstream ifs;
         ifs.open("kernel", std::ios::in);
         std::string infile;
-        infile.assign((std::istreambuf_iterator<char>(ifs)),
-                       std::istreambuf_iterator<char>());
+        infile.assign(std::istreambuf_iterator<char>(ifs),
+                      std::istreambuf_iterator<char>());
         ifs.close();
         const char *cptr = infile.c_str();
         mProg = clCreateProgramWithSource(mCtx, 1, (const char **)&cptr, NULL, &err);
