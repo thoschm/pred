@@ -1,9 +1,10 @@
- inline float gaussian(const float mu,
+inline float gaussian(const float mu,
                        const float sigma,
                        const float scale,
                        const float value)
 {
     const float d = value - mu;
+    //return scale * exp(-0.5f * d * d / (sigma * sigma));
     return scale / (1.0f + sigma * d * d);
 }
 
