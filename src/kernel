@@ -1,3 +1,13 @@
+ inline float gaussian(const float mu,
+                       const float sigma,
+                       const float scale,
+                       const float value)
+{
+    const float d = value - mu;
+    return scale / (1.0f + sigma * d * d);
+}
+
+
 __kernel void pso(__constant const float *paramsf, 
 				  __constant const uint *paramsi,
 				  __global const float *data, 
@@ -14,6 +24,8 @@ __kernel void pso(__constant const float *paramsf,
 	const uint targetAhead = paramsi[0];
 	const uint lastItem = paramsi[1];
 	const uint localWindow = paramsi[2];
+	const uint Window = paramsi[3];
+	const uint Nodes = paramsi[4];	
 	
 	// ids
 	uint gid = get_global_id(0);
@@ -25,12 +37,49 @@ __kernel void pso(__constant const float *paramsf,
 		gid = get_group_id(0) * get_local_size(0);
 		lid = 0;
 	}
+
+	// normalize data window to 0-1
+    float vmin = FLT_MAX,
+          vmax = -FLT_MAX;
+    for (uint k = 0; k < Window; ++k)
+    {
+        const uint idx = gid + k;
+        if (data[idx] < vmin) vmin = data[idx];
+        if (data[idx] > vmax) vmax = data[idx];
+    }
+    float scale;
+    if (vmin == vmax)
+    {
+        scale = 1.0f;
+        vmin -= 0.5f;
+    }
+    else
+    {
+        scale = 1.0f / (vmax - vmin);
+    }
+
+    // compute teacher
+    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (data[gid + Window + targetAhead - 1u] - vmin));
+
+	// kernel response
+	float sum = 0.0f;
+	uint counter = 0;
+    for (uint i = 0; i < Window; ++i)
+    {
+        for (uint k = 0; k < Nodes; ++k)
+        {
+            sum += gaussian(particle[counter++],
+                            fabs(particle[counter++]) + minSigma,
+                            particle[counter++],
+                            scale * (data[gid + i] - vmin));
+        }
+    }
+    sum /= (float)(Window * Nodes);
 	
-	// fill local memory
+	// compute error
+	const float err = sum - teacher;	
+	out[gid] = err * err;
 	
-	
-	
-	
-	out[gid] = gid;
-	printf("gid=%u, lid=%u, grp=%u\n", gid, lid, get_group_id(0));
+	//uint bla = gid + Window + targetAhead - 1u;
+	//printf("min=%f, max=%f, gid=%u, teach=%u, resp=%f, teacher=%f\n", vmin, vmax, gid, bla, sum, teacher); 
 }

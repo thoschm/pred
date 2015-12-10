@@ -135,7 +135,7 @@ public:
 
         // create actual kernel function
         mKrnl = clCreateKernel(mProg, "pso", &err);
-        if (!mKrnl|| err != CL_SUCCESS)
+        if (!mKrnl || err != CL_SUCCESS)
         {
             std::cerr << "failed load kernel function!\n";
             exit(EXIT_FAILURE);
@@ -150,7 +150,7 @@ public:
         }
 
 
-        kernelWSize = 4u;
+        //kernelWSize = 8u;
 
 
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
@@ -170,10 +170,12 @@ public:
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[3];
+        uint pi[5];
         pi[0] = targetAhead;
         pi[1] = mDataNoWindowSize - 1u; // last valid index
         pi[2] = localWindowSize;
+        pi[3] = Window;
+        pi[4] = Nodes;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
@@ -440,12 +442,12 @@ int main(int argc, char **argv)
     std::vector<float> indata;
 
 
-    for (uint i = 0; i < 20u; ++i)
+    for (uint i = 0; i < 20000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
 
-    PSOCL<2, 1> pso(1u, 1.0f, 1.0f, 1u, 0.0001f, indata.data(), indata.size());
+    PSOCL<5000, 1> pso(1u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
     pso.init(0.0f, 1.0f);
     pso.step();
 }
