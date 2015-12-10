@@ -6,6 +6,7 @@
 // INCLUDES
 /////////////////////////////////
 #include "PSO.h"
+#include "PSOCL.h"
 #include <iostream>
 #include <cmath>
 #include <vector>
@@ -492,6 +493,54 @@ public:
         {
             result->data[i].mu    = values[cnt++];
             result->data[i].sigma = std::fabs(values[cnt++]) + pl.minSigma;
+            result->data[i].scale = values[cnt++];
+        }
+
+        // set target
+        result->targetVal = targetValue;
+        result->targetSig = targetSigma;
+
+        return pso.getScore();
+    }
+
+
+    static float optimizeOCL(Kernel<float, Window, Nodes> *result,
+                             const std::vector<float> &data,
+                             const float targetValue,
+                             const float targetSigma,
+                             const uint targetAhead,
+                             const float lowerLimit,
+                             const float upperLimit,
+                             const uint particleCount,
+                             const float breakScore,
+                             const uint breakLoops = UINT_MAX)
+    {
+        const float minSigma = 0.00001f;
+
+        PSOCL<Window, Nodes> pso(particleCount,
+                                 targetValue,
+                                 targetSigma,
+                                 targetAhead,
+                                 minSigma,
+                                 data.data(),
+                                 data.size());
+        pso.init(lowerLimit, upperLimit);
+
+        float s;
+        uint l = 0;
+        while ((s = pso.step()) > breakScore)
+        {
+            std::cerr << "\roptimization error = " << s;
+            if (++l == breakLoops) break;
+        }
+        std::cerr << "\roptimization error = " << s << std::endl;
+        const float *values = pso.getBest();
+
+        uint cnt = 0;
+        for (uint i = 0; i < Window * Nodes; ++i)
+        {
+            result->data[i].mu    = values[cnt++];
+            result->data[i].sigma = std::fabs(values[cnt++]) + minSigma;
             result->data[i].scale = values[cnt++];
         }
 

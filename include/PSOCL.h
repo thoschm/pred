@@ -1,5 +1,12 @@
 
 
+#ifndef _PSOCL_H_
+#define _PSOCL_H_
+
+
+/////////////////////////////////
+// INCLUDES
+/////////////////////////////////
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS
 #include <OpenCL/opencl.h>
 #include <iostream>
@@ -11,14 +18,18 @@
 #include <assert.h>
 
 
-using namespace Predictor;
+/////////////////////////////////
+// NAMESPACE
+/////////////////////////////////
+namespace Predictor
+{
 
 
 /////////////////////////////////
 // Particle
 /////////////////////////////////
 template <int Dim>
-struct Particle
+struct OCLParticle
 {
     float x[Dim],
           v[Dim],
@@ -59,9 +70,12 @@ public:
         assert(sizeof(float) == sizeof(cl_float));
         assert(sizeof(uint) == sizeof(cl_uint));
 
+        // fix rnd
+        mRnd.setSeed(0x12345678u);
+
         // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(float));
-        mParticles = new Particle<Dim>[particleCount];
+        mParticles = new OCLParticle<Dim>[particleCount];
 
         // init opencl platform and device
         int err;
@@ -259,7 +273,7 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<Dim> &par = mParticles[i];
+            OCLParticle<Dim> &par = mParticles[i];
             par.score = FLT_MAX;
             par.tmp = FLT_MAX;
 
@@ -284,7 +298,7 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<Dim> &par = mParticles[i];
+            OCLParticle<Dim> &par = mParticles[i];
 
             // write current particle
             int err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
@@ -325,7 +339,7 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            Particle<Dim> &par = mParticles[i];
+            OCLParticle<Dim> &par = mParticles[i];
 
             // update scores
             if (par.tmp < par.score)
@@ -358,7 +372,7 @@ public:
     }
 
     // get particle pointer
-    const Particle<Dim> *getParticles()
+    const OCLParticle<Dim> *getParticles()
     {
         return mParticles;
     }
@@ -387,7 +401,7 @@ public:
         std::cerr << "particles.: " << std::endl;
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<Dim> &par = mParticles[i];
+            const OCLParticle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
                 std::cerr << par.x[d] << " ";
@@ -404,7 +418,7 @@ public:
         of.open(file, std::ios::out);
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const Particle<Dim> &par = mParticles[i];
+            const OCLParticle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
                 of << par.x[d] << " ";
@@ -416,7 +430,7 @@ public:
 
 protected:
     uint mParticleCount;
-    Particle<Dim> *mParticles;
+    OCLParticle<Dim> *mParticles;
     XorShift<float> mRnd;
     float *mResults;
 
@@ -445,24 +459,6 @@ protected:
 };
 
 
+} // namespace
 
-
-int main(int argc, char **argv)
-{
-    std::vector<float> indata;
-
-
-    for (uint i = 0; i < 5000u; ++i)
-    {
-        indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
-    }
-
-    PSOCL<100, 2> pso(100u, 1.0f, 1.0f, 10u, 0.0001f, indata.data(), indata.size());
-    pso.init(0.0f, 1.0f);
-    float s;
-    while ((s = pso.step()) > 0.001f)
-    {
-        std::cerr << "\roptimization error = " << s;
-    }
-    std::cerr << "\roptimization error = " << s << std::endl;
-}
+#endif
