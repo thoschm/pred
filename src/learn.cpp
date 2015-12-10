@@ -13,7 +13,7 @@ using namespace Predictor;
 #define LOOK_AHEAD 50u
 
 #define PARTICLES 100u
-#define BREAK_ERROR 0.01f
+#define BREAK_ERROR 0.1f
 #define BREAK_LOOPS 5000u
 
 #define TSIGMA 10.0f
@@ -93,7 +93,7 @@ int main(int argc, char **argv)
         std::cerr << "*** learning kernel " << c << " ***" << std::endl
                   << "kernel target: " << k << ", target sigma: " << TSIGMA << std::endl;
         Kernel<float, WINDOW, NODES> krnl;
-        KernelOptimizer<float, WINDOW, NODES>::optimize(&krnl,
+        KernelOptimizer<float, WINDOW, NODES>::optimizeOCL(&krnl,
                                                         indata, k,
                                                         TSIGMA,
                                                         LOOK_AHEAD,
@@ -103,6 +103,8 @@ int main(int argc, char **argv)
                                                         BREAK_LOOPS);
         std::cerr << "--> optimization done." << std::endl << std::endl;
         vec.push_back(krnl);
+
+        //KernelOperation<float, WINDOW, NODES>::print(krnl);
     }
 
     // store result
