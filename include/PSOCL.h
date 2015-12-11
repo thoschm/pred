@@ -23,22 +23,6 @@
 /////////////////////////////////
 namespace Predictor
 {
-
-
-/////////////////////////////////
-// Particle
-/////////////////////////////////
-template <int Dim>
-struct OCLParticle
-{
-    float x[Dim],
-          v[Dim],
-          best[Dim],
-          score,
-          tmp;
-};
-
-
 /////////////////////////////////
 // PSO class
 /////////////////////////////////
@@ -59,7 +43,11 @@ public:
           const float minSigma,
           const std::vector<float> &data) :
           mParticleCount(particleCount),
-          mParticles(NULL),
+          mPartX(NULL),
+          mPartV(NULL),
+          mPartBest(NULL),
+          mPartScore(NULL),
+          mPartTmp(NULL),
           mW(0.0f),
           mCP(0.0f),
           mCG(0.0f),
@@ -74,7 +62,11 @@ public:
 
         // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(float));
-        mParticles = new OCLParticle<Dim>[particleCount];
+        mPartX = new float[Dim * particleCount];
+        mPartV = new float[Dim * particleCount];
+        mPartBest = new float[Dim * particleCount];
+        mPartScore = new float[particleCount];
+        mPartTmp = new float[particleCount];
 
         // init opencl platform and device
         int err;
@@ -271,7 +263,11 @@ public:
         delete[] mResults;
 
         // delete particles
-        delete[] mParticles;
+        delete[] mPartX;
+        delete[] mPartV;
+        delete[] mPartBest;
+        delete[] mPartScore;
+        delete[] mPartTmp;
     }
 
     // init
@@ -291,17 +287,17 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // for each particle
-            OCLParticle<Dim> &par = mParticles[i];
-            par.score = FLT_MAX;
-            par.tmp = FLT_MAX;
+            mPartScore[i] = FLT_MAX;
+            mPartTmp[i] = FLT_MAX;
 
             // init
             for (uint d = 0; d < Dim; ++d)
             {
                 // x, v, best
-                par.x[d] = mRnd.uniform() * diff + lowerLimit;
-                par.v[d] = mRnd.uniform() * 2.0f * diff - diff;
-                par.best[d] = mRnd.uniform() * diff + lowerLimit;
+                const uint idx = i * Dim + d;
+                mPartX[idx] = mRnd.uniform() * diff + lowerLimit;
+                mPartV[idx] = mRnd.uniform() * 2.0f * diff - diff;
+                mPartBest[idx] = mRnd.uniform() * diff + lowerLimit;
             }
         }
 
@@ -315,8 +311,8 @@ public:
     {
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            // for each particle
-            OCLParticle<Dim> &par = mParticles[i];
+            // baseline index
+            const uint idx = Dim * i;
 
             // set particle id
             int err = clSetKernelArg(mKrnl, 7, sizeof(uint), &i);
@@ -327,7 +323,7 @@ public:
             }
 
             // write current particle
-            err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
+            err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &mPartX[idx], 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to write particle to device!\n";
@@ -359,48 +355,48 @@ public:
             {
                 sum += mResults[r];
             }
-            par.tmp = sum / mDataNoWindowSize;
+            mPartTmp[i] = sum / mDataNoWindowSize;
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            // for each particle
-            OCLParticle<Dim> &par = mParticles[i];
-
             // update scores
-            if (par.tmp < par.score)
+            if (mPartTmp[i] < mPartScore[i])
             {
-                par.score = par.tmp;
-                memcpy(par.best, par.x, Dim * sizeof(float));
+                const uint idx = Dim * i;
+                mPartScore[i] = mPartTmp[i];
+                memcpy(&mPartBest[idx], &mPartX[idx], Dim * sizeof(float));
 
                 // swarm
-                if (par.tmp < mBestScore)
+                if (mPartTmp[i] < mBestScore)
                 {
-                    mBestScore = par.tmp;
-                    memcpy(mBestPos, par.x, Dim * sizeof(float));
+                    mBestScore = mPartTmp[i];
+                    memcpy(mBestPos, &mPartX[idx], Dim * sizeof(float));
                 }
             }
 
             // update position x
             for (uint d = 0; d < Dim; ++d)
             {
+                // index
+                const uint idx = i * Dim + d;
                 // uniform random values
                 const float rp = mRnd.uniform(),
                             rg = mRnd.uniform();
                 // update velocity and pos
-                par.v[d] = mW * par.v[d] +
-                           mCP * rp * (par.best[d] - par.x[d]) +
-                           mCG * rg * (mBestPos[d] - par.x[d]);
-                par.x[d] += par.v[d];
+                mPartV[idx] = mW * mPartV[idx] +
+                           mCP * rp * (mPartBest[idx] - mPartX[idx]) +
+                           mCG * rg * (mBestPos[d] - mPartX[idx]);
+                mPartX[idx] += mPartV[idx];
             }
         }
         return mBestScore;
     }
 
     // get particle pointer
-    const OCLParticle<Dim> *getParticles()
+    const float *getParticles()
     {
-        return mParticles;
+        return mPartX;
     }
 
     // get current best
@@ -427,10 +423,10 @@ public:
         std::cerr << "particles.: " << std::endl;
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const OCLParticle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
-                std::cerr << par.x[d] << " ";
+                const uint idx = i * Dim + d;
+                std::cerr << mPartX[idx] << " ";
             }
             std::cerr << std::endl;
         }
@@ -444,10 +440,10 @@ public:
         of.open(file, std::ios::out);
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            const OCLParticle<Dim> &par = mParticles[i];
             for (uint d = 0; d < Dim; ++d)
             {
-                of << par.x[d] << " ";
+                const uint idx = i * Dim + d;
+                of << mPartX[idx] << " ";
             }
             of << std::endl;
         }
@@ -456,7 +452,11 @@ public:
 
 protected:
     uint mParticleCount;
-    OCLParticle<Dim> *mParticles;
+    float *mPartX,
+          *mPartV,
+          *mPartBest,
+          *mPartScore,
+          *mPartTmp;
     XorShift<float> mRnd;
     float *mResults;
 
