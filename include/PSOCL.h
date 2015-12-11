@@ -99,10 +99,6 @@ public:
         std::cerr << "computing units: " << units << std::endl;
         std::cerr << "float vector wi: " << width << std::endl;
         std::cerr << "max const size.: " << constMemSize << std::endl;
-        if (Dim * sizeof(float) > constMemSize)
-        {
-            std::cerr << "WARNING: particle size exceeds constant memory capacity\n";
-        }
         std::cerr << "max local size.: " << locMemSize << std::endl;
 
         // context
@@ -190,23 +186,25 @@ public:
         }
 
         // alloc host mem for results
-        mResults = new float[mGroups];
+        mResults = new float[particleCount * mGroups];
 
         float pf[3];
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[5];
+        uint pi[7];
         pi[0] = targetAhead;
         pi[1] = Window;
         pi[2] = Nodes;
         pi[3] = localWindowSize;
         pi[4] = mDataNoWindowSize;
+        pi[5] = Dim;
+        pi[6] = mGroups;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
-        mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mGroups * sizeof(float), NULL, NULL);
+        mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, particleCount * Dim * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, particleCount * mGroups * sizeof(float), NULL, NULL);
         if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -309,24 +307,22 @@ public:
     // one optimization step
     float step()
     {
+        // write particles
+        int err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, mParticleCount * Dim * sizeof(float), mPartX, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed to write particles to device!\n";
+            exit(EXIT_FAILURE);
+        }
+
+        // launch kernels
         for (uint i = 0; i < mParticleCount; ++i)
         {
-            // baseline index
-            const uint idx = Dim * i;
-
             // set particle id
-            int err = clSetKernelArg(mKrnl, 7, sizeof(uint), &i);
+            err = clSetKernelArg(mKrnl, 7, sizeof(uint), &i);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to set particle id!\n" << err;
-                exit(EXIT_FAILURE);
-            }
-
-            // write current particle
-            err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &mPartX[idx], 0, NULL, NULL);
-            if (err != CL_SUCCESS)
-            {
-                std::cerr << "failed to write particle to device!\n";
                 exit(EXIT_FAILURE);
             }
 
@@ -337,29 +333,30 @@ public:
                 std::cerr << "failed to execute kernel!\n";
                 exit(EXIT_FAILURE);
             }
+        }
 
-            // wait finish
-            clFinish(mCmd);
+        // wait finish
+        clFinish(mCmd);
 
-            // read results
-            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mGroups * sizeof(float), mResults, 0, NULL, NULL);
-            if (err != CL_SUCCESS)
-            {
-                std::cerr << "failed to read results!\n";
-                exit(EXIT_FAILURE);
-            }
-
-            // compute score
-            float sum = 0.0f;
-            for (uint r = 0; r < mGroups; ++r)
-            {
-                sum += mResults[r];
-            }
-            mPartTmp[i] = sum / mDataNoWindowSize;
+        // read results
+        err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mParticleCount * mGroups * sizeof(float), mResults, 0, NULL, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed to read results!\n";
+            exit(EXIT_FAILURE);
         }
 
         for (uint i = 0; i < mParticleCount; ++i)
         {
+            // compute score
+            float sum = 0.0f;
+            for (uint r = 0; r < mGroups; ++r)
+            {
+                const uint idx = i * mGroups + r;
+                sum += mResults[idx];
+            }
+            mPartTmp[i] = sum / mDataNoWindowSize; // TODO: tmp not necessary
+
             // update scores
             if (mPartTmp[i] < mPartScore[i])
             {
@@ -385,8 +382,8 @@ public:
                             rg = mRnd.uniform();
                 // update velocity and pos
                 mPartV[idx] = mW * mPartV[idx] +
-                           mCP * rp * (mPartBest[idx] - mPartX[idx]) +
-                           mCG * rg * (mBestPos[d] - mPartX[idx]);
+                              mCP * rp * (mPartBest[idx] - mPartX[idx]) +
+                              mCG * rg * (mBestPos[d] - mPartX[idx]);
                 mPartX[idx] += mPartV[idx];
             }
         }
