@@ -68,7 +68,8 @@ __kernel void pso(__constant const float *paramsf,
     }
 
     // compute teacher
-    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (data[gid + (Window - 1) + targetAhead] - vmin));
+    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (lmem[lid + (Window - 1) + targetAhead] - vmin));
+	//printf("%u %u\n", lid + (Window - 1) + targetAhead, localWindowSize);
 
 	// kernel response
 	float sum = 0.0f;
@@ -80,7 +81,7 @@ __kernel void pso(__constant const float *paramsf,
             sum += gaussian(particle[counter++],
                             fabs(particle[counter++]) + minSigma,
                             particle[counter++],
-                            scale * (data[gid + i] - vmin));
+                            scale * (lmem[lid + i] - vmin));
         }
     }
     sum /= (float)(Window * Nodes);
