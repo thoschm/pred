@@ -45,7 +45,7 @@ __kernel void pso(__constant const float *paramsf,
         uint lidx = lid + i;            
         if (lidx >= localWindowSize)
         {
-                lidx = lid;
+            lidx = lid;
         }       
         const uint gidx = off + lidx;
         ldat[lidx] = data[gidx];
@@ -102,7 +102,7 @@ __kernel void pso(__constant const float *paramsf,
     {
         if (lid < shift)
         {
-                ltmp[lid] += ltmp[lid + shift];
+            ltmp[lid] += ltmp[lid + shift];
         }
         barrier(CLK_LOCAL_MEM_FENCE);
     }

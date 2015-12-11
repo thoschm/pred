@@ -8,9 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 100u
+#define WINDOW 500u
 #define NODES  2u
-#define LOOK_AHEAD 50u
+#define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.1f
