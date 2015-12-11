@@ -84,6 +84,8 @@ public:
         char devName[100];
         cl_uint units,
                 width;
+        cl_ulong constMemSize,
+                 locMemSize;
 
         // get device
         err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
@@ -98,10 +100,18 @@ public:
         clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, NULL);
         clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &units, NULL);
         clGetDeviceInfo(device_id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint), &width, NULL);
+        clGetDeviceInfo(device_id, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(cl_ulong), &constMemSize, NULL);
+        clGetDeviceInfo(device_id, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &locMemSize, NULL);
         std::cerr << "selected device: " << devName << std::endl;
         std::cerr << "work group size: " << workGroupSize << std::endl;
         std::cerr << "computing units: " << units << std::endl;
         std::cerr << "float vector wi: " << width << std::endl;
+        std::cerr << "max const size.: " << constMemSize << std::endl;
+        if (Dim * sizeof(float) > constMemSize)
+        {
+            std::cerr << "WARNING: particle size exceeds constant memory capacity\n";
+        }
+        std::cerr << "max local size.: " << locMemSize << std::endl;
 
         // context
         mCtx = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
@@ -181,6 +191,10 @@ public:
         // create buffers
         const uint localWindowSize = mWorkSize + (Window - 1) + targetAhead;
         std::cerr << "local window sz: " << localWindowSize << std::endl;
+        if (localWindowSize * sizeof(float) > locMemSize)
+        {
+            std::cerr << "WARNING: local window size exceeds local memory capacity\n";
+        }
 
         // alloc host mem for results
         mResults = new float[mDataNoWindowSize];
