@@ -10,12 +10,13 @@ inline float gaussian(const float mu,
 
 
 __kernel void pso(__constant const float *paramsf, 
-                                  __constant const uint *paramsi,
-                                  __global const float *data, 
-                                  __constant const float *particle, 
-                                  __global float *out, 
-                                  __local float *ldat,
-                                  __local float *ltmp)
+                  __constant const uint *paramsi,
+                  __global const float *data, 
+                  __constant const float *particle, 
+                  __global float *out, 
+                  __local float *ldat,
+                  __local float *ltmp,
+                  const uint partID)
 {
     // params float
     const float targetValue = paramsf[0];

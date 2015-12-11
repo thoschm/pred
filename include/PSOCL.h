@@ -318,8 +318,16 @@ public:
             // for each particle
             OCLParticle<Dim> &par = mParticles[i];
 
+            // set particle id
+            int err = clSetKernelArg(mKrnl, 7, sizeof(uint), &i);
+            if (err != CL_SUCCESS)
+            {
+                std::cerr << "failed to set particle id!\n" << err;
+                exit(EXIT_FAILURE);
+            }
+
             // write current particle
-            int err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
+            err = clEnqueueWriteBuffer(mCmd, mParticle, CL_TRUE, 0, Dim * sizeof(float), &(par.x), 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to write particle to device!\n";
