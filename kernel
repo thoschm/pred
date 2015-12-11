@@ -14,7 +14,7 @@ __kernel void pso(__constant const float *paramsf,
 				  __global const float *data, 
 				  __constant const float *particle, 
 				  __global float *out, 
-				  __local float *tmp)
+				  __local float *lmem)
 {
 	// params float
 	const float targetValue = paramsf[0];
@@ -25,19 +25,36 @@ __kernel void pso(__constant const float *paramsf,
 	const uint targetAhead = paramsi[0];
 	const uint Window = paramsi[1];
 	const uint Nodes = paramsi[2];	
+	const uint localWindowSize = paramsi[3];
 	
 	// ids
 	const uint gid = get_global_id(0);
 	const uint lid = get_local_id(0);
+	const uint los = get_local_size(0);
+	const uint off = get_group_id(0) * los;
+	
+	// copy global to local memory
+	for (uint i = 0; i < localWindowSize; i += los)
+	{
+		uint lidx = lid + i;		
+		if (lidx >= localWindowSize)
+		{
+			lidx = lid;
+		}	
+		const uint gidx = off + lidx;
+		lmem[lidx] = data[gidx];
+	}
+	//printf("%f %f\n", lmem[lid], data[gid]);
+	barrier(CLK_LOCAL_MEM_FENCE);
 
 	// normalize data window to 0-1
     float vmin = FLT_MAX,
           vmax = -FLT_MAX;
     for (uint k = 0; k < Window; ++k)
     {
-        const uint idx = gid + k;
-        if (data[idx] < vmin) vmin = data[idx];
-        if (data[idx] > vmax) vmax = data[idx];
+        const uint idx = lid + k;
+        if (lmem[idx] < vmin) vmin = lmem[idx];
+        if (lmem[idx] > vmax) vmax = lmem[idx];
     }
     float scale;
     if (vmin == vmax)

@@ -148,7 +148,7 @@ public:
         err = clBuildProgram(mProg, 1, &device_id, NULL, NULL, NULL);
         char buffer[2048];
         clGetProgramBuildInfo(mProg, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
-        std::cerr << buffer << std::endl;
+        std::cerr << buffer;
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to build kernel!\n";
@@ -171,6 +171,10 @@ public:
             exit(EXIT_FAILURE);
         }
         assert(!(kernelWSize & (kernelWSize - 1))); // check power of 2
+
+
+        //kernelWSize = 4u;
+
 
         // print preferred kernel work size
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
@@ -202,10 +206,11 @@ public:
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[3];
+        uint pi[4];
         pi[0] = targetAhead;
         pi[1] = Window;
         pi[2] = Nodes;
+        pi[3] = localWindowSize;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
