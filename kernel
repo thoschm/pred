@@ -10,47 +10,47 @@ inline float gaussian(const float mu,
 
 
 __kernel void pso(__constant const float *paramsf, 
-				  __constant const uint *paramsi,
-				  __global const float *data, 
-				  __constant const float *particle, 
-				  __global float *out, 
-				  __local float *ldat,
-				  __local float *ltmp)
+                                  __constant const uint *paramsi,
+                                  __global const float *data, 
+                                  __constant const float *particle, 
+                                  __global float *out, 
+                                  __local float *ldat,
+                                  __local float *ltmp)
 {
-	// params float
-	const float targetValue = paramsf[0];
-	const float targetSigma = paramsf[1];
-	const float minSigma = paramsf[2];
-	
-	// params uint
-	const uint targetAhead = paramsi[0];
-	const uint Window = paramsi[1];
-	const uint Nodes = paramsi[2];	
-	const uint localWindowSize = paramsi[3];
-	const uint dataNoWindowSize = paramsi[4];
-	
-	// ids
-	const uint gid = get_global_id(0);
-	const uint lid = get_local_id(0);
-	const uint los = get_local_size(0);
-	const uint grp = get_group_id(0);
-	const uint off = grp * los;
-	
-	// copy global to local memory
-	for (uint i = 0; i < localWindowSize; i += los)
-	{
-		uint lidx = lid + i;		
-		if (lidx >= localWindowSize)
-		{
-			lidx = lid;
-		}	
-		const uint gidx = off + lidx;
-		ldat[lidx] = data[gidx];
-	}
-	//printf("%f %f\n", ldat[lid], data[gid]);
-	barrier(CLK_LOCAL_MEM_FENCE);
+    // params float
+    const float targetValue = paramsf[0];
+    const float targetSigma = paramsf[1];
+    const float minSigma = paramsf[2];
+    
+    // params uint
+    const uint targetAhead = paramsi[0];
+    const uint Window = paramsi[1];
+    const uint Nodes = paramsi[2];  
+    const uint localWindowSize = paramsi[3];
+    const uint dataNoWindowSize = paramsi[4];
+    
+    // ids
+    const uint gid = get_global_id(0);
+    const uint lid = get_local_id(0);
+    const uint los = get_local_size(0);
+    const uint grp = get_group_id(0);
+    const uint off = grp * los;
+        
+    // copy global to local memory
+    for (uint i = 0; i < localWindowSize; i += los)
+    {
+            uint lidx = lid + i;            
+            if (lidx >= localWindowSize)
+            {
+                    lidx = lid;
+            }       
+            const uint gidx = off + lidx;
+            ldat[lidx] = data[gidx];
+    }
+    //printf("%f %f\n", ldat[lid], data[gid]);
+    barrier(CLK_LOCAL_MEM_FENCE);
 
-	// normalize data window to 0-1
+    // normalize data window to 0-1
     float vmin = FLT_MAX,
           vmax = -FLT_MAX;
     for (uint k = 0; k < Window; ++k)
@@ -72,11 +72,11 @@ __kernel void pso(__constant const float *paramsf,
 
     // compute teacher
     const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (ldat[lid + (Window - 1) + targetAhead] - vmin));
-	//printf("%u %u\n", lid + (Window - 1) + targetAhead, localWindowSize);
+    //printf("%u %u\n", lid + (Window - 1) + targetAhead, localWindowSize);
 
-	// kernel response
-	float sum = 0.0f;
-	uint counter = 0;
+    // kernel response
+    float sum = 0.0f;
+    uint counter = 0;
     for (uint i = 0; i < Window; ++i)
     {
         for (uint k = 0; k < Nodes; ++k)
@@ -88,27 +88,27 @@ __kernel void pso(__constant const float *paramsf,
         }
     }
     sum /= (float)(Window * Nodes);
-	
-	// compute error
-	const float err = 1.0f;//sum - teacher;	
-	ltmp[lid] = (gid < dataNoWindowSize) ? (err * err) : (0.0f);
-	barrier(CLK_LOCAL_MEM_FENCE);
-	
-	// reduce
-	for (uint shift = (los >> 1); shift > 0; shift >>= 1)
-	{
-		if (lid < shift)
-		{
-			ltmp[lid] += ltmp[lid + shift];
-		}
-		barrier(CLK_LOCAL_MEM_FENCE);
-	}
-	
-	printf("%u %f\n", lid, ltmp[0]);
-	
-	// write out
-	if (lid == 0)
-	{
-		out[grp] = ltmp[0];	
-	}
+        
+    // compute error
+    const float err = 1.0f;//sum - teacher; 
+    ltmp[lid] = (gid < dataNoWindowSize) ? (err * err) : (0.0f);
+    barrier(CLK_LOCAL_MEM_FENCE);
+    
+    // reduce
+    for (uint shift = (los >> 1); shift > 0; shift >>= 1)
+    {
+        if (lid < shift)
+        {
+                ltmp[lid] += ltmp[lid + shift];
+        }
+        barrier(CLK_LOCAL_MEM_FENCE);
+    }
+        
+    printf("%u %f\n", lid, ltmp[0]);
+    
+    // write out
+    if (lid == 0)
+    {
+            out[grp] = ltmp[0];     
+    }
 }
