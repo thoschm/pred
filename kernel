@@ -40,8 +40,9 @@ __kernel void pso(__constant const float *paramsf,
     const uint off = grp * los;
         
     // copy global to local memory
-    for (uint i = 0; i < localWindowSize; i += los)
+    /*for (uint i = 0; i < localWindowSize; i += los)
     {
+        <this is to make sure its commented>
         uint lidx = lid + i;            
         if (lidx >= localWindowSize)
         {
@@ -49,7 +50,11 @@ __kernel void pso(__constant const float *paramsf,
         }       
         const uint gidx = off + lidx;
         ldat[lidx] = data[gidx];
-    }
+    }*/
+    for (uint i = lid; i < localWindowSize; i += los)
+    {
+        ldat[i] = data[off + i];
+    }   
     //printf("%f %f\n", ldat[lid], data[gid]);
     barrier(CLK_LOCAL_MEM_FENCE);
 
