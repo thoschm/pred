@@ -179,8 +179,10 @@ public:
         // compute global size
         mDataNoWindowSize = data.size() - (Window - 1) - targetAhead;
         std::cerr << "items needed...: " << mDataNoWindowSize << std::endl;
-        mGlobalSize = std::ceil(1.0f * mDataNoWindowSize / mWorkSize) * mWorkSize;
+        mGroups = std::ceil(1.0f * mDataNoWindowSize / mWorkSize);
+        mGlobalSize = mGroups * mWorkSize;
         std::cerr << "global size....: " << mGlobalSize << std::endl;
+        std::cerr << "work groups....: " << mGroups << std::endl;
 
         // append dummy data to fill last work group
         std::vector<float> dcopy = data;
@@ -196,7 +198,7 @@ public:
         }
 
         // alloc host mem for results
-        mResults = new float[mDataNoWindowSize];
+        mResults = new float[mGroups];
 
         float pf[3];
         pf[0] = targetValue;
@@ -212,7 +214,7 @@ public:
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mGlobalSize * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mGroups * sizeof(float), NULL, NULL);
         if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -336,7 +338,7 @@ public:
             clFinish(mCmd);
 
             // read results
-            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mDataNoWindowSize * sizeof(float), mResults, 0, NULL, NULL);
+            err = clEnqueueReadBuffer(mCmd, mResult, CL_TRUE, 0, mGroups * sizeof(float), mResults, 0, NULL, NULL);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to read results!\n";
@@ -345,7 +347,7 @@ public:
 
             // compute score
             float sum = 0.0f;
-            for (uint r = 0; r < mDataNoWindowSize; ++r)
+            for (uint r = 0; r < mGroups; ++r)
             {
                 sum += mResults[r];
             }
@@ -471,7 +473,8 @@ protected:
            mParticle;
     size_t mWorkSize,
            mGlobalSize;
-    uint mDataNoWindowSize;
+    uint mDataNoWindowSize,
+         mGroups;
 };
 
 
