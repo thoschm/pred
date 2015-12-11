@@ -522,8 +522,7 @@ public:
                                  targetSigma,
                                  targetAhead,
                                  minSigma,
-                                 data.data(),
-                                 data.size());
+                                 data);
         pso.init(lowerLimit, upperLimit);
 
         float s;

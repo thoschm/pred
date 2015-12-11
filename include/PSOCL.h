@@ -57,8 +57,7 @@ public:
           const float targetSigma,
           const uint  targetAhead,
           const float minSigma,
-          const float *data,
-          const uint dataSize) :
+          const std::vector<float> &data) :
           mParticleCount(particleCount),
           mParticles(NULL),
           mW(0.0f),
@@ -162,22 +161,25 @@ public:
             std::cerr << "failed to get kernel max worksize!\n";
             exit(EXIT_FAILURE);
         }
+        assert(!(kernelWSize & (kernelWSize - 1))); // check power of 2
 
-
-        //kernelWSize = 8u;
-        assert((kernelWSize != 0) && !(kernelWSize & (kernelWSize - 1))); // check power of 2
-
+        // print preferred kernel work size
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
 
         // compute global size
-        mDataNoWindowSize = dataSize - (Window - 1u) - targetAhead;
+        mDataNoWindowSize = data.size() - (Window - 1) - targetAhead;
         std::cerr << "items needed...: " << mDataNoWindowSize << std::endl;
         mGlobalSize = std::ceil(1.0f * mDataNoWindowSize / mWorkSize) * mWorkSize;
         std::cerr << "global size....: " << mGlobalSize << std::endl;
 
+        // append dummy data to fill last work group
+        std::vector<float> dcopy = data;
+        dcopy.resize(mGlobalSize + (Window - 1) + targetAhead, 0.0f);
+        std::cerr << "inflated data..: " << data.size() << " to " << dcopy.size() << std::endl;
+
         // create buffers
-        const uint localWindowSize = mWorkSize + Window - 1u + targetAhead;
+        const uint localWindowSize = mWorkSize + (Window - 1) + targetAhead;
         std::cerr << "local window sz: " << localWindowSize << std::endl;
 
         // alloc host mem for results
@@ -187,17 +189,15 @@ public:
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[5];
+        uint pi[3];
         pi[0] = targetAhead;
-        pi[1] = mDataNoWindowSize - 1u; // last valid index
-        pi[2] = localWindowSize;
-        pi[3] = Window;
-        pi[4] = Nodes;
+        pi[1] = Window;
+        pi[2] = Nodes;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
-        mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dataSize * sizeof(float), NULL, NULL);
+        mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, Dim * sizeof(float), NULL, NULL);
-        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mDataNoWindowSize * sizeof(float), NULL, NULL);
+        mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, mGlobalSize * sizeof(float), NULL, NULL);
         if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
@@ -213,7 +213,7 @@ public:
             exit(EXIT_FAILURE);
         }
 
-        err = clEnqueueWriteBuffer(mCmd, mData, CL_TRUE, 0, dataSize * sizeof(float), data, 0, NULL, NULL);
+        err = clEnqueueWriteBuffer(mCmd, mData, CL_TRUE, 0, dcopy.size() * sizeof(float), dcopy.data(), 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to write input sequence to device!\n";
