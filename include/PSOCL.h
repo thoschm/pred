@@ -190,7 +190,7 @@ public:
         // create buffers
         const uint localWindowSize = mWorkSize + (Window - 1) + targetAhead;
         std::cerr << "local window sz: " << localWindowSize << std::endl;
-        if (localWindowSize * sizeof(float) > locMemSize)
+        if ((localWindowSize + mWorkSize) * sizeof(float) > locMemSize)
         {
             std::cerr << "WARNING: local window size exceeds local memory capacity\n";
         }
@@ -202,11 +202,12 @@ public:
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[4];
+        uint pi[5];
         pi[0] = targetAhead;
         pi[1] = Window;
         pi[2] = Nodes;
         pi[3] = localWindowSize;
+        pi[4] = mDataNoWindowSize;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
@@ -242,6 +243,7 @@ public:
         err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mParticle);
         err |= clSetKernelArg(mKrnl, 4, sizeof(cl_mem), &mResult);
         err |= clSetKernelArg(mKrnl, 5, localWindowSize * sizeof(float), NULL);
+        err |= clSetKernelArg(mKrnl, 6, mWorkSize * sizeof(float), NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
