@@ -172,10 +172,6 @@ public:
         }
         assert(!(kernelWSize & (kernelWSize - 1))); // check power of 2
 
-
-        //kernelWSize = 4u;
-
-
         // print preferred kernel work size
         std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
