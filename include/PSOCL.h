@@ -146,13 +146,11 @@ public:
 
         // build kernel
         err = clBuildProgram(mProg, 1, &device_id, NULL, NULL, NULL);
+        char buffer[2048];
+        clGetProgramBuildInfo(mProg, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
         if (err != CL_SUCCESS)
         {
-            size_t len;
-            char buffer[2048];
             std::cerr << "failed to build kernel!\n";
-            clGetProgramBuildInfo(mProg, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, &len);
-            std::cerr << buffer << std::endl;
             exit(EXIT_FAILURE);
         }
 
