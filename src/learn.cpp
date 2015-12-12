@@ -8,9 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 500u
+#define WINDOW 1000u
 #define NODES  2u
-#define LOOK_AHEAD 100u
+#define LOOK_AHEAD 1000u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.1f
@@ -78,7 +78,7 @@ int main(int argc, char **argv)
         return EXIT_FAILURE;
     }*/
 
-    for (uint i = 0; i < 2000u; ++i)
+    for (uint i = 0; i < 20000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
