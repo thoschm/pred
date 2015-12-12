@@ -8,7 +8,7 @@
 // INCLUDES
 /////////////////////////////////
 #define CL_USE_DEPRECATED_OPENCL_2_0_APIS
-#include <OpenCL/opencl.h>
+#include <CL/cl.h>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -71,6 +71,7 @@ public:
         // init opencl platform and device
         int err;
         cl_device_id device_id;
+        cl_platform_id platform_id;
         size_t workGroupSize,
                kernelWSize;
         char devName[100];
@@ -79,8 +80,16 @@ public:
         cl_ulong constMemSize,
                  locMemSize;
 
+        // get platform
+        err = clGetPlatformIDs(1, &platform_id, NULL);
+        if (err != CL_SUCCESS)
+        {
+            std::cerr << "failed to get platform id!\n";
+            exit(EXIT_FAILURE);
+        }
+
         // get device
-        err = clGetDeviceIDs(NULL, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
+        err = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to get device id!\n";
