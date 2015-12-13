@@ -41,13 +41,14 @@ public:
           const float targetSigma,
           const uint  targetAhead,
           const float minSigma,
-          const std::vector<float> &data) :
+          const std::vector<float> &data,
+          const bool useCPU,
+          const uint deviceID) :
           mParticleCount(particleCount),
           mPartX(NULL),
           mPartV(NULL),
           mPartBest(NULL),
           mPartScore(NULL),
-          mPartTmp(NULL),
           mW(0.0f),
           mCP(0.0f),
           mCG(0.0f),
@@ -66,11 +67,10 @@ public:
         mPartV = new float[Dim * particleCount];
         mPartBest = new float[Dim * particleCount];
         mPartScore = new float[particleCount];
-        mPartTmp = new float[particleCount];
 
         // init opencl platform and device
         int err;
-        cl_device_id device_id;
+        cl_device_id *device_id = new cl_device_id[deviceID + 1];
         cl_platform_id platform_id;
         size_t workGroupSize,
                kernelWSize;
@@ -89,20 +89,26 @@ public:
         }
 
         // get device
-        err = clGetDeviceIDs(platform_id, CL_DEVICE_TYPE_GPU, 1, &device_id, NULL);
+        cl_uint retval;
+        err = clGetDeviceIDs(platform_id, useCPU ? CL_DEVICE_TYPE_CPU : CL_DEVICE_TYPE_GPU, deviceID + 1, device_id, &retval);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to get device id!\n";
             exit(EXIT_FAILURE);
         }
+        if (deviceID >= retval)
+        {
+            std::cerr << "selected device not found!\n";
+            exit(EXIT_FAILURE);
+        }
 
         // print some info about gpu
-        clGetDeviceInfo(device_id, CL_DEVICE_NAME, 100 * sizeof(char), devName, NULL);
-        clGetDeviceInfo(device_id, CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, NULL);
-        clGetDeviceInfo(device_id, CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &units, NULL);
-        clGetDeviceInfo(device_id, CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint), &width, NULL);
-        clGetDeviceInfo(device_id, CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(cl_ulong), &constMemSize, NULL);
-        clGetDeviceInfo(device_id, CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &locMemSize, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_NAME, 100 * sizeof(char), devName, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_MAX_WORK_GROUP_SIZE, sizeof(size_t), &workGroupSize, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_MAX_COMPUTE_UNITS, sizeof(cl_uint), &units, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint), &width, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(cl_ulong), &constMemSize, NULL);
+        clGetDeviceInfo(device_id[deviceID], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &locMemSize, NULL);
         std::cerr << "selected device: " << devName << std::endl;
         std::cerr << "work group size: " << workGroupSize << std::endl;
         std::cerr << "computing units: " << units << std::endl;
@@ -111,7 +117,7 @@ public:
         std::cerr << "max local size.: " << locMemSize << std::endl;
 
         // context
-        mCtx = clCreateContext(0, 1, &device_id, NULL, NULL, &err);
+        mCtx = clCreateContext(0, 1, &device_id[deviceID], NULL, NULL, &err);
         if (!mCtx)
         {
             std::cerr << "failed to create opencl context!\n";
@@ -119,7 +125,7 @@ public:
         }
 
         // Q
-        mCmd = clCreateCommandQueue(mCtx, device_id, 0, &err);
+        mCmd = clCreateCommandQueue(mCtx, device_id[deviceID], 0, &err);
         if (!mCmd)
         {
             std::cerr << "failed to create queue!\n";
@@ -142,9 +148,9 @@ public:
         }
 
         // build kernel
-        err = clBuildProgram(mProg, 1, &device_id, NULL, NULL, NULL);
+        err = clBuildProgram(mProg, 1, &device_id[deviceID], NULL, NULL, NULL);
         char buffer[2048];
-        clGetProgramBuildInfo(mProg, device_id, CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
+        clGetProgramBuildInfo(mProg, device_id[deviceID], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
         std::cerr << buffer;
         if (err != CL_SUCCESS)
         {
@@ -161,7 +167,7 @@ public:
         }
 
         // Get the maximum work group size for executing the kernel on the device
-        err = clGetKernelWorkGroupInfo(mKrnl, device_id, CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWSize, NULL);
+        err = clGetKernelWorkGroupInfo(mKrnl, device_id[deviceID], CL_KERNEL_WORK_GROUP_SIZE, sizeof(size_t), &kernelWSize, NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to get kernel max worksize!\n";
@@ -250,6 +256,9 @@ public:
             std::cerr << "failed to set kernel arguments!\n";
             exit(EXIT_FAILURE);
         }
+
+        // some cleanup
+        delete[] device_id;
     }
 
     // release particles
@@ -274,7 +283,6 @@ public:
         delete[] mPartV;
         delete[] mPartBest;
         delete[] mPartScore;
-        delete[] mPartTmp;
     }
 
     // init
@@ -295,7 +303,6 @@ public:
         {
             // for each particle
             mPartScore[i] = FLT_MAX;
-            mPartTmp[i] = FLT_MAX;
 
             // init
             for (uint d = 0; d < Dim; ++d)
@@ -364,19 +371,19 @@ public:
                 const uint idx = i * mGroups + r;
                 sum += mResults[idx];
             }
-            mPartTmp[i] = sum / mDataNoWindowSize; // TODO: tmp not necessary
+            sum /= mDataNoWindowSize;
 
             // update scores
-            if (mPartTmp[i] < mPartScore[i])
+            if (sum < mPartScore[i])
             {
                 const uint idx = Dim * i;
-                mPartScore[i] = mPartTmp[i];
+                mPartScore[i] = sum;
                 memcpy(&mPartBest[idx], &mPartX[idx], Dim * sizeof(float));
 
                 // swarm
-                if (mPartTmp[i] < mBestScore)
+                if (sum < mBestScore)
                 {
-                    mBestScore = mPartTmp[i];
+                    mBestScore = sum;
                     memcpy(mBestPos, &mPartX[idx], Dim * sizeof(float));
                 }
             }
@@ -461,8 +468,7 @@ protected:
     float *mPartX,
           *mPartV,
           *mPartBest,
-          *mPartScore,
-          *mPartTmp;
+          *mPartScore;
     XorShift<float> mRnd;
     float *mResults;
 

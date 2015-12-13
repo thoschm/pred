@@ -513,7 +513,9 @@ public:
                              const float upperLimit,
                              const uint particleCount,
                              const float breakScore,
-                             const uint breakLoops = UINT_MAX)
+                             const uint breakLoops = UINT_MAX,
+                             const bool useCPU = false,
+                             const uint deviceID = 0)
     {
         const float minSigma = 0.00001f;
 
@@ -522,7 +524,9 @@ public:
                                  targetSigma,
                                  targetAhead,
                                  minSigma,
-                                 data);
+                                 data,
+                                 useCPU,
+                                 deviceID);
         pso.init(lowerLimit, upperLimit);
 
         float s;
