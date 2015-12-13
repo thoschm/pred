@@ -109,13 +109,14 @@ public:
         clGetDeviceInfo(device_id[deviceID], CL_DEVICE_PREFERRED_VECTOR_WIDTH_FLOAT, sizeof(cl_uint), &width, NULL);
         clGetDeviceInfo(device_id[deviceID], CL_DEVICE_MAX_CONSTANT_BUFFER_SIZE, sizeof(cl_ulong), &constMemSize, NULL);
         clGetDeviceInfo(device_id[deviceID], CL_DEVICE_LOCAL_MEM_SIZE, sizeof(cl_ulong), &locMemSize, NULL);
+        /*
         std::cerr << "selected device: " << devName << std::endl;
         std::cerr << "work group size: " << workGroupSize << std::endl;
         std::cerr << "computing units: " << units << std::endl;
         std::cerr << "float vector wi: " << width << std::endl;
         std::cerr << "max const size.: " << constMemSize << std::endl;
         std::cerr << "max local size.: " << locMemSize << std::endl;
-
+        */
         // context
         mCtx = clCreateContext(0, 1, &device_id[deviceID], NULL, NULL, &err);
         if (!mCtx)
@@ -176,25 +177,25 @@ public:
         assert(!(kernelWSize & (kernelWSize - 1))); // check power of 2
 
         // print preferred kernel work size
-        std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
+        //std::cerr << "kernel wrk size: " << kernelWSize << std::endl;
         mWorkSize = kernelWSize;
 
         // compute global size
         mDataNoWindowSize = data.size() - (Window - 1) - targetAhead;
-        std::cerr << "items needed...: " << mDataNoWindowSize << std::endl;
+        //std::cerr << "items needed...: " << mDataNoWindowSize << std::endl;
         mGroups = std::ceil(1.0f * mDataNoWindowSize / mWorkSize);
         mGlobalSize = mGroups * mWorkSize;
-        std::cerr << "global size....: " << mGlobalSize << std::endl;
-        std::cerr << "work groups....: " << mGroups << std::endl;
+        //std::cerr << "global size....: " << mGlobalSize << std::endl;
+        //std::cerr << "work groups....: " << mGroups << std::endl;
 
         // append dummy data to fill last work group
         std::vector<float> dcopy = data;
         dcopy.resize(mGlobalSize + (Window - 1) + targetAhead, 0.0f);
-        std::cerr << "inflated data..: " << data.size() << " to " << dcopy.size() << std::endl;
+        //std::cerr << "inflated data..: " << data.size() << " to " << dcopy.size() << std::endl;
 
         // create buffers
         const uint localWindowSize = mWorkSize + (Window - 1) + targetAhead;
-        std::cerr << "local window sz: " << localWindowSize << std::endl;
+        //std::cerr << "local window sz: " << localWindowSize << std::endl;
         if ((localWindowSize + mWorkSize) * sizeof(float) > locMemSize)
         {
             std::cerr << "WARNING: local window size exceeds local memory capacity\n";
