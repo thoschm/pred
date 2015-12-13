@@ -141,6 +141,7 @@ int main(int argc, char **argv)
             {
                 std::cerr << "GPU" << tid << ": target = " << target << ", error = " << score << std::endl;
                 vec[kid] = krnl;
+                //KernelOperation<float, WINDOW, NODES>::print(krnl);
             }
             else
             {
