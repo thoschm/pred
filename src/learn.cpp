@@ -89,25 +89,28 @@ int main(int argc, char **argv)
 */
     dumpSequence(indata, "sine.txt");
 
-    std::deque<float> targets;
-    std::vector<Kernel<float, WINDOW, NODES> > vec;
+    std::deque<std::pair<uint, float> > targets;
+    uint c = 0;
     for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP)
     {
-        targets.push_back(k);
+        targets.push_back(std::make_pair(c++, k));
     }
+    std::vector<Kernel<float, WINDOW, NODES> > vec(targets.size());
 
     omp_set_num_threads(devs);
 #pragma omp parallel shared(targets) shared(vec)
     for (bool run = true; run; )
     {
         float target;
+        uint kid;
         const uint tid = omp_get_thread_num();
 
 #pragma omp critical
         {
             if (targets.size() > 0)
             {
-                target = targets.front();
+                kid = targets.front().first;
+                target = targets.front().second;
                 targets.pop_front();
             }
             else
@@ -137,7 +140,7 @@ int main(int argc, char **argv)
             if (run)
             {
                 std::cerr << "GPU" << tid << ": target = " << target << ", error = " << score << std::endl;
-                vec.push_back(krnl);
+                vec[kid] = krnl;
             }
             else
             {
