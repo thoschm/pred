@@ -3,7 +3,6 @@
 #include <Predictor.h>
 #include <fstream>
 #include <stdlib.h>
-#include <deque>
 #include <omp.h>
 
 
@@ -89,7 +88,7 @@ int main(int argc, char **argv)
 */
     dumpSequence(indata, "sine.txt");
 
-    std::deque<std::pair<uint, float> > targets;
+    std::vector<std::pair<uint, float> > targets;
     uint c = 0;
     for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP)
     {
@@ -102,16 +101,16 @@ int main(int argc, char **argv)
     for (bool run = true; run; )
     {
         float target;
-        uint kid;
+        uint kid = UINT_MAX;
         const uint tid = omp_get_thread_num();
 
 #pragma omp critical
         {
             if (targets.size() > 0)
             {
-                kid = targets.front().first;
-                target = targets.front().second;
-                targets.pop_front();
+                kid = targets.back().first;
+                target = targets.back().second;
+                targets.pop_back();
             }
             else
             {
