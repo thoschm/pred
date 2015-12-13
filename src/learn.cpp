@@ -98,7 +98,7 @@ int main(int argc, char **argv)
 
     omp_set_num_threads(devs);
 #pragma omp parallel shared(targets) shared(vec)
-    for ( ; ; )
+    for (bool run = true; run; )
     {
         float target;
         const uint tid = omp_get_thread_num();
@@ -112,30 +112,37 @@ int main(int argc, char **argv)
             }
             else
             {
-                target = FLT_MAX;
+                run = false;
             }
         }
 
-        if (target == FLT_MAX)
+        Kernel<float, WINDOW, NODES> krnl;
+        float score;
+        if (run)
         {
-            break;
+            score = KernelOptimizer<float, WINDOW, NODES>::optimizeOCL(&krnl,
+                                                                       indata, target,
+                                                                       TSIGMA,
+                                                                       LOOK_AHEAD,
+                                                                       0.0f, 1.0f,
+                                                                       PARTICLES,
+                                                                       BREAK_ERROR,
+                                                                       BREAK_LOOPS,
+                                                                       false,
+                                                                       tid);
         }
 
-        Kernel<float, WINDOW, NODES> krnl;
-        const float score = KernelOptimizer<float, WINDOW, NODES>::optimizeOCL(&krnl,
-                                                                               indata, target,
-                                                                               TSIGMA,
-                                                                               LOOK_AHEAD,
-                                                                               0.0f, 1.0f,
-                                                                               PARTICLES,
-                                                                               BREAK_ERROR,
-                                                                               BREAK_LOOPS,
-                                                                               false,
-                                                                               tid);
 #pragma omp critical
         {
-            std::cerr << "GPU" << tid << ": target = " << target << ", error = " << score << std::endl;
-            vec.push_back(krnl);
+            if (run)
+            {
+                std::cerr << "GPU" << tid << ": target = " << target << ", error = " << score << std::endl;
+                vec.push_back(krnl);
+            }
+            else
+            {
+                std::cerr << "GPU" << tid << ": done" << std::endl;
+            }
         }
     }
 
