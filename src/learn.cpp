@@ -9,12 +9,12 @@
 using namespace Predictor;
 
 
-#define WINDOW 200u
+#define WINDOW 1000u
 #define NODES  2u
-#define LOOK_AHEAD 50u
+#define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
-#define BREAK_ERROR 0.1f
+#define BREAK_ERROR 0.001f
 #define BREAK_LOOPS 5000u
 
 #define TSIGMA 10.0f
@@ -97,7 +97,7 @@ int main(int argc, char **argv)
     std::vector<Kernel<float, WINDOW, NODES> > vec(targets.size());
 
     omp_set_num_threads(devs);
-#pragma omp parallel shared(targets) shared(vec)
+#pragma omp parallel shared(targets, vec)
     for (bool run = true; run; )
     {
         float target;
