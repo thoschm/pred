@@ -9,18 +9,18 @@
 using namespace Predictor;
 
 
-#define WINDOW 1000u
+#define WINDOW 2000u
 #define NODES  2u
-#define LOOK_AHEAD 100u
+#define LOOK_AHEAD 500u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.001f
 #define BREAK_LOOPS 5000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN  -10.0f
-#define KRNL_MAX  11.0f
-#define KRNL_STEP 0.2f
+#define KRNL_MIN  -50.0f
+#define KRNL_MAX  51.0f
+#define KRNL_STEP 0.05f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -80,12 +80,12 @@ int main(int argc, char **argv)
     }
     uint devs = atoi(argv[2]);
 
-/*
-    for (uint i = 0; i < 20000u; ++i)
+
+    /*for (uint i = 0; i < 5000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
-    }
-*/
+    }*/
+
     dumpSequence(indata, "sine.txt");
 
     std::vector<std::pair<uint, float> > targets;

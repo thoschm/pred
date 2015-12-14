@@ -8,9 +8,10 @@
 using namespace Predictor;
 
 
-#define WINDOW 200u
-#define NODES  2u
-#define LOOK_AHEAD 50u
+
+#define WINDOW 20u
+#define NODES  5u
+#define LOOK_AHEAD 5u
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -100,7 +101,7 @@ int main(int argc, char **argv)
                 mf2 = activations[k];
             }
         }
-        if (mf1 >= 1.0f * mf2)
+        if (mf1 > 0.8f)
         {
             outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx1];
             if (i + WINDOW + LOOK_AHEAD - 1 < indata.size())
