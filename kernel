@@ -87,12 +87,13 @@ __kernel void pso(__constant const float *paramsf,
     uint counter = Dim * partID;
     for (uint i = 0; i < Window; ++i)
     {
+    	const float curval = scale * (ldat[lid + i] - vmin);
         for (uint k = 0; k < Nodes; ++k)
-        {
-            sum += gaussian(particle[counter++],
-                            fabs(particle[counter++]) + minSigma,
-                            particle[counter++],
-                            scale * (ldat[lid + i] - vmin));
+        {       
+        	const float mu = particle[counter]; ++counter;
+        	const float si = fabs(particle[counter]) + minSigma; ++counter;
+        	const float sc = particle[counter]; ++counter;
+            sum += gaussian(mu, si, sc, curval);
         }
     }
     sum /= (float)(Window * Nodes);

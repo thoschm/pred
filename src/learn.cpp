@@ -9,18 +9,18 @@
 using namespace Predictor;
 
 
-#define WINDOW 2000u
+#define WINDOW 200u
 #define NODES  2u
-#define LOOK_AHEAD 500u
+#define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
-#define BREAK_ERROR 0.001f
+#define BREAK_ERROR 0.1f
 #define BREAK_LOOPS 5000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN  -50.0f
-#define KRNL_MAX  51.0f
-#define KRNL_STEP 0.05f
+#define KRNL_MIN  -5.0f
+#define KRNL_MAX  6.0f
+#define KRNL_STEP 1.0f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -150,11 +150,12 @@ int main(int argc, char **argv)
     }
 
 /*
+    std::vector<Kernel<float, WINDOW, NODES> > vec;
     // learn kernels
-    uint c = 0;
-    for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP, ++c)
+    uint cn = 0;
+    for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP, ++cn)
     {
-        std::cerr << "*** learning kernel " << c << " ***" << std::endl
+        std::cerr << "*** learning kernel " << cn << " ***" << std::endl
                   << "kernel target: " << k << ", target sigma: " << TSIGMA << std::endl;
         Kernel<float, WINDOW, NODES> krnl;
         KernelOptimizer<float, WINDOW, NODES>::optimize(&krnl,

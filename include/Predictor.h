@@ -139,13 +139,14 @@ public:
         NumericalType sum = (NumericalType)0.0;
         for (uint i = 0; i < Window; ++i)
         {
+            const float curval = scale * (data[startAt + i] - minVal);
             for (uint k = 0; k < Nodes; ++k)
             {
                 const uint idx = i * Nodes + k; // counter would suffice
                 sum += gaussian(krnl.data[idx].mu,
                                 krnl.data[idx].sigma,
                                 krnl.data[idx].scale,
-                                scale * (data[startAt + i] - minVal));
+                                curval);
             }
         }
         return sum / (NumericalType)(Window * Nodes);

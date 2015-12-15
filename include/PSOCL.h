@@ -59,7 +59,7 @@ public:
         assert(sizeof(uint) == sizeof(cl_uint));
 
         // fix rnd
-        //mRnd.setSeed(0x12345678u);
+        mRnd.setSeed(0x12345678u);
 
         // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(float));
