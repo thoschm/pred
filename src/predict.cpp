@@ -8,10 +8,9 @@
 using namespace Predictor;
 
 
-#define WINDOW 2000u
-#define NODES  2u
-#define LOOK_AHEAD 500u
-
+#define WINDOW 500u
+#define NODES  1u
+#define LOOK_AHEAD 333u
 
 bool loadSequence(std::vector<float> *seq, const char *file)
 {
@@ -82,8 +81,9 @@ int main(int argc, char **argv)
     for (uint i = 0; i <= size; ++i)
     {
         KernelOperation<float, WINDOW, NODES>::queryKernels(&activations, &prediction, vec, indata, i);
-        float mf1 = -1.0f, mf2 = -1.0f;
+        float mf1 = -1.0f;
         uint idx1 = 0;
+        std::cerr << "STEP: " << i << std::endl;
         for (uint k = 0; k < activations.size(); ++k)
         {
             if (activations[k] > mf1)
@@ -91,17 +91,10 @@ int main(int argc, char **argv)
                 mf1 = activations[k];
                 idx1 = k;
             }
+            //std::cerr << vec[k].targetVal << ":" << activations[k] << " ";
         }
-        for (uint k = 0; k < activations.size(); ++k)
-        {
-            if (k == idx1) continue;
-            if (activations[k] > mf2)
-            {
-                mf2 = activations[k];
-            }
-        }
-        std::cerr << mf1 << " " << mf2 << " " << vec[idx1].targetVal << std::endl;
-        //if (mf1 > 0.8f)
+        std::cerr << "\nSELECTED: " << vec[idx1].targetVal << std::endl;
+        //if (vec[idx1].targetVal != 0.5f)
         {
             outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx1];
             if (i + WINDOW + LOOK_AHEAD - 1 < indata.size())

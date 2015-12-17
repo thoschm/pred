@@ -226,17 +226,44 @@ public:
     static void applyKernel(const Kernel<NumericalType, Window, Nodes> &krnl,
                             const std::vector<NumericalType> &data,
                             std::vector<NumericalType> *out,
+                            std::vector<NumericalType> *err,
+                            const NumericalType targetValue,
+                            const NumericalType targetSigma,
                             const uint ahead = 1)
     {
         out->clear();
         out->resize(data.size(), (NumericalType)0.0);
+        err->clear();
+        err->resize(data.size(), (NumericalType)0.0);
         const uint limit = data.size() - Window - ahead;
         for (uint i = 0; i <= limit; ++i)
         {
             // normalize window
             NumericalType vmin, scale;
             normalize(data, i, &vmin, &scale);
-            out->at(i + Window + ahead - 1) = response(krnl, data, i, vmin, scale);
+
+            // compute teacher and kernel response
+            NumericalType teacher;
+            const NumericalType testVal = scale * (data[i + Window + ahead - 1] - vmin);
+            if (TFunc == GAUSSIAN)
+            {
+                teacher = gaussian(targetValue, targetSigma,
+                                  (NumericalType)1.0, testVal);
+            }
+            else if (TFunc == GAUSSIAN_UP_1)
+            {
+                teacher = gaussian_up1(targetValue, targetSigma,
+                                      (NumericalType)1.0, testVal);
+            }
+            else if (TFunc == GAUSSIAN_DOWN_1)
+            {
+                teacher = gaussian_down1(targetValue, targetSigma,
+                                        (NumericalType)1.0, testVal);
+            }
+            const NumericalType resp = response(krnl, data, i, vmin, scale);
+            const NumericalType tmp = resp - teacher;
+            out->at(i + Window + ahead - 1) = resp;
+            err->at(i + Window + ahead - 1) = tmp * tmp;
         }
     }
 
@@ -481,7 +508,7 @@ public:
         pso.init(lowerLimit, upperLimit);
         NumericalType s;
         uint l = 0;
-        while ((s = pso.step()) > breakScore)
+        while ((s = std::sqrt(pso.step())) > breakScore)
         {
             std::cerr << "\roptimization error = " << s;
             if (++l == breakLoops) break;
@@ -501,7 +528,7 @@ public:
         result->targetVal = targetValue;
         result->targetSig = targetSigma;
 
-        return pso.getScore();
+        return s;
     }
 
 
@@ -532,7 +559,7 @@ public:
 
         float s;
         uint l = 0;
-        while ((s = pso.step()) > breakScore)
+        while ((s = std::sqrt(pso.step())) > breakScore)
         {
             //std::cerr << "\roptimization error = " << s;
             if (++l == breakLoops) break;
@@ -552,7 +579,7 @@ public:
         result->targetVal = targetValue;
         result->targetSig = targetSigma;
 
-        return pso.getScore();
+        return s;
     }
 
 
