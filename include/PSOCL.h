@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <iomanip>
 #include <sstream>
 #include "XorShift.h"
 #include <float.h>
@@ -151,7 +152,10 @@ public:
 
         // build kernel
         std::ostringstream oss;
-        oss << "-D WINDOW=" << Window << "u -D NODES=" << Nodes << "u -D DIM=" << Dim << "u -D AHEAD=" << targetAhead << "u";
+        oss << "-D WINDOW=" << Window << "u -D NODES=" << Nodes << "u -D DIM=" << Dim << "u -D AHEAD=" << targetAhead << "u"
+            << std::setprecision(10) << std::fixed
+            << " -D TARGET=" << targetValue << "f -D SIGMA=" << targetSigma << "f -D MINSIGMA=" << minSigma << "f";
+        //std::cerr << oss.str() << std::endl;
         err = clBuildProgram(mProg, 1, &device_id[deviceID], oss.str().c_str(), NULL, NULL);
         char buffer[2048];
         clGetProgramBuildInfo(mProg, device_id[deviceID], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
@@ -207,29 +211,23 @@ public:
         // alloc host mem for results
         mResults = new float[particleCount * mGroups];
 
-        // TODO: build args
-        float pf[3];
-        pf[0] = targetValue;
-        pf[1] = targetSigma;
-        pf[2] = minSigma;
+        // args
         uint pi[3];
         pi[0] = localWindowSize;
         pi[1] = mDataNoWindowSize;
         pi[2] = mGroups;
-        mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);
         mParticle = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, particleCount * Dim * sizeof(float), NULL, NULL);
         mResult   = clCreateBuffer(mCtx, CL_MEM_WRITE_ONLY, particleCount * mGroups * sizeof(float), NULL, NULL);
-        if (!mParamsf || !mParamsi || !mData || !mParticle || !mResult)
+        if (!mParamsi || !mData || !mParticle || !mResult)
         {
             std::cerr << "failed to allocate device memory!\n";
             exit(EXIT_FAILURE);
         }
 
         // write constant data to device
-        err = clEnqueueWriteBuffer(mCmd, mParamsf, CL_TRUE, 0, sizeof(pf), pf, 0, NULL, NULL);
-        err |= clEnqueueWriteBuffer(mCmd, mParamsi, CL_TRUE, 0, sizeof(pi), pi, 0, NULL, NULL);
+        err = clEnqueueWriteBuffer(mCmd, mParamsi, CL_TRUE, 0, sizeof(pi), pi, 0, NULL, NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to write params!\n";
@@ -245,13 +243,12 @@ public:
 
         // set kernel arguments
         err = 0;
-        err |= clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParamsf);
-        err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mParamsi);
-        err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mData);
-        err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mParticle);
-        err |= clSetKernelArg(mKrnl, 4, sizeof(cl_mem), &mResult);
-        err |= clSetKernelArg(mKrnl, 5, localWindowSize * sizeof(float), NULL);
-        err |= clSetKernelArg(mKrnl, 6, mWorkSize * sizeof(float), NULL);
+        err |= clSetKernelArg(mKrnl, 0, sizeof(cl_mem), &mParamsi);
+        err |= clSetKernelArg(mKrnl, 1, sizeof(cl_mem), &mData);
+        err |= clSetKernelArg(mKrnl, 2, sizeof(cl_mem), &mParticle);
+        err |= clSetKernelArg(mKrnl, 3, sizeof(cl_mem), &mResult);
+        err |= clSetKernelArg(mKrnl, 4, localWindowSize * sizeof(float), NULL);
+        err |= clSetKernelArg(mKrnl, 5, mWorkSize * sizeof(float), NULL);
         if (err != CL_SUCCESS)
         {
             std::cerr << "failed to set kernel arguments!\n";
@@ -269,7 +266,6 @@ public:
         clReleaseMemObject(mResult);
         clReleaseMemObject(mParticle);
         clReleaseMemObject(mData);
-        clReleaseMemObject(mParamsf);
         clReleaseMemObject(mParamsi);
         clReleaseProgram(mProg);
         clReleaseKernel(mKrnl);
@@ -336,7 +332,7 @@ public:
         for (uint i = 0; i < mParticleCount; ++i)
         {
             // set particle id
-            err = clSetKernelArg(mKrnl, 7, sizeof(uint), &i);
+            err = clSetKernelArg(mKrnl, 6, sizeof(uint), &i);
             if (err != CL_SUCCESS)
             {
                 std::cerr << "failed to set particle id!\n" << err;
@@ -487,8 +483,7 @@ protected:
     cl_command_queue mCmd;
     cl_program mProg;
     cl_kernel mKrnl;
-    cl_mem mParamsf,
-           mParamsi,
+    cl_mem mParamsi,
            mData,
            mResult,
            mParticle;

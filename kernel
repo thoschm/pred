@@ -9,8 +9,7 @@ inline float gaussian(const float mu,
 }
 
 
-__kernel void pso(__constant const float *paramsf, 
-                  __constant const uint *paramsi,
+__kernel void pso(__constant const uint *paramsi,
                   __global const float *data, 
                   __global const float *particle, 
                   __global float *out, 
@@ -18,11 +17,6 @@ __kernel void pso(__constant const float *paramsf,
                   __local float *ltmp,
                   const uint partID)
 {
-    // params float
-    const float targetValue = paramsf[0];
-    const float targetSigma = paramsf[1];
-    const float minSigma = paramsf[2];
-    
     // params uint
     const uint localWindowSize = paramsi[0];
     const uint dataNoWindowSize = paramsi[1];
@@ -75,7 +69,7 @@ __kernel void pso(__constant const float *paramsf,
     }
 
     // compute teacher
-    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (ldat[lid + (WINDOW - 1) + AHEAD] - vmin));
+    const float teacher = gaussian(TARGET, SIGMA, 1.0f, scale * (ldat[lid + (WINDOW - 1) + AHEAD] - vmin));
     //printf("%u %u\n", lid + (WINDOW - 1) + AHEAD, localWindowSize);
 
     // kernel response
@@ -87,7 +81,7 @@ __kernel void pso(__constant const float *paramsf,
         for (uint k = 0; k < NODES; ++k)
         {       
             const float mu = particle[counter]; ++counter;
-            const float si = fabs(particle[counter]) + minSigma; ++counter;
+            const float si = fabs(particle[counter]) + MINSIGMA; ++counter;
             const float sc = particle[counter]; ++counter;
             sum += gaussian(mu, si, sc, curval);
         }

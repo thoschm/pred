@@ -10,12 +10,12 @@ using namespace Predictor;
 
 
 #define WINDOW 500u
-#define NODES  2u
+#define NODES  1u
 #define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.00001f
-#define BREAK_LOOPS 100000u
+#define BREAK_LOOPS 100u
 
 #define TSIGMA 10.0f
 #define KRNL_MIN  0.5f
