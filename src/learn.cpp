@@ -10,17 +10,17 @@ using namespace Predictor;
 
 
 #define WINDOW 500u
-#define NODES  1u
-#define LOOK_AHEAD 333u
+#define NODES  2u
+#define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
-#define BREAK_ERROR 0.0001f
-#define BREAK_LOOPS 100u
+#define BREAK_ERROR 0.00001f
+#define BREAK_LOOPS 100000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN  -3.0f
-#define KRNL_MAX  3.0f
-#define KRNL_STEP 0.1f
+#define KRNL_MIN  0.5f
+#define KRNL_MAX  10.0f
+#define KRNL_STEP 100.0f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -74,17 +74,17 @@ int main(int argc, char **argv)
 
     // load input sequence
     std::vector<float> indata;
-    /*if (!loadSequence(&indata, argv[1]))
+    if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
-    }*/
+    }
     uint devs = atoi(argv[2]);
 
-
+/*
     for (uint i = 0; i < 3000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
-    }
+    }*/
 
 
     dumpSequence(indata, "sine.txt");
@@ -176,6 +176,16 @@ int main(int argc, char **argv)
     // store result
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
     std::cerr << "results stored as kernels.bin\n";
+
+    std::vector<float> resp, errk;
+    KernelOperation<float, WINDOW, NODES>::applyKernel(vec[0], indata, &resp, &errk, KRNL_MIN, TSIGMA, LOOK_AHEAD);
+    for (uint k = 0; k < resp.size(); ++k)
+    {
+        resp[k] *= 100.0f;
+        errk[k] *= 100.0f;
+    }
+    dumpSequence(resp, "response.txt");
+    dumpSequence(errk, "error.txt");
 
     return 0;
 }

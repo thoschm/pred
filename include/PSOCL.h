@@ -12,6 +12,7 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <sstream>
 #include "XorShift.h"
 #include <float.h>
 #include <string.h>
@@ -149,7 +150,9 @@ public:
         }
 
         // build kernel
-        err = clBuildProgram(mProg, 1, &device_id[deviceID], NULL, NULL, NULL);
+        std::ostringstream oss;
+        oss << "-D WINDOW=" << Window << "u -D NODES=" << Nodes << "u -D DIM=" << Dim << "u -D AHEAD=" << targetAhead << "u";
+        err = clBuildProgram(mProg, 1, &device_id[deviceID], oss.str().c_str(), NULL, NULL);
         char buffer[2048];
         clGetProgramBuildInfo(mProg, device_id[deviceID], CL_PROGRAM_BUILD_LOG, sizeof(buffer), buffer, NULL);
         std::cerr << buffer;
@@ -204,18 +207,15 @@ public:
         // alloc host mem for results
         mResults = new float[particleCount * mGroups];
 
+        // TODO: build args
         float pf[3];
         pf[0] = targetValue;
         pf[1] = targetSigma;
         pf[2] = minSigma;
-        uint pi[7];
-        pi[0] = targetAhead;
-        pi[1] = Window;
-        pi[2] = Nodes;
-        pi[3] = localWindowSize;
-        pi[4] = mDataNoWindowSize;
-        pi[5] = Dim;
-        pi[6] = mGroups;
+        uint pi[3];
+        pi[0] = localWindowSize;
+        pi[1] = mDataNoWindowSize;
+        pi[2] = mGroups;
         mParamsf  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pf), NULL, NULL);
         mParamsi  = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, sizeof(pi), NULL, NULL);
         mData     = clCreateBuffer(mCtx, CL_MEM_READ_ONLY, dcopy.size() * sizeof(float), NULL, NULL);

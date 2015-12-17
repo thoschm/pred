@@ -24,13 +24,9 @@ __kernel void pso(__constant const float *paramsf,
     const float minSigma = paramsf[2];
     
     // params uint
-    const uint targetAhead = paramsi[0];
-    const uint Window = paramsi[1];
-    const uint Nodes = paramsi[2];  
-    const uint localWindowSize = paramsi[3];
-    const uint dataNoWindowSize = paramsi[4];
-    const uint Dim = paramsi[5];
-    const uint Groups = paramsi[6];
+    const uint localWindowSize = paramsi[0];
+    const uint dataNoWindowSize = paramsi[1];
+    const uint Groups = paramsi[2];
     
     // ids
     const uint gid = get_global_id(0);
@@ -61,7 +57,7 @@ __kernel void pso(__constant const float *paramsf,
     // normalize data window to 0-1
     float vmin = FLT_MAX,
           vmax = -FLT_MAX;
-    for (uint k = 0; k < Window; ++k)
+    for (uint k = 0; k < WINDOW; ++k)
     {
         const uint idx = lid + k;
         if (ldat[idx] < vmin) vmin = ldat[idx];
@@ -79,16 +75,16 @@ __kernel void pso(__constant const float *paramsf,
     }
 
     // compute teacher
-    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (ldat[lid + (Window - 1) + targetAhead] - vmin));
-    //printf("%u %u\n", lid + (Window - 1) + targetAhead, localWindowSize);
+    const float teacher = gaussian(targetValue, targetSigma, 1.0f, scale * (ldat[lid + (WINDOW - 1) + AHEAD] - vmin));
+    //printf("%u %u\n", lid + (WINDOW - 1) + AHEAD, localWindowSize);
 
     // kernel response
     float sum = 0.0f;
-    uint counter = Dim * partID;
-    for (uint i = 0; i < Window; ++i)
+    uint counter = DIM * partID;
+    for (uint i = 0; i < WINDOW; ++i)
     {
     	const float curval = scale * (ldat[lid + i] - vmin);
-        for (uint k = 0; k < Nodes; ++k)
+        for (uint k = 0; k < NODES; ++k)
         {       
             const float mu = particle[counter]; ++counter;
             const float si = fabs(particle[counter]) + minSigma; ++counter;
@@ -96,7 +92,7 @@ __kernel void pso(__constant const float *paramsf,
             sum += gaussian(mu, si, sc, curval);
         }
     }
-    sum /= (float)(Window * Nodes);
+    sum /= (float)(WINDOW * NODES);
         
     // compute error
     const float err = sum - teacher; 
