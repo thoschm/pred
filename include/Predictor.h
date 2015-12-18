@@ -561,10 +561,10 @@ public:
         uint l = 0;
         while ((s = std::sqrt(pso.step())) > breakScore)
         {
-            std::cerr << "\roptimization error = " << s;
+            //std::cerr << "\roptimization error = " << s;
             if (++l == breakLoops) break;
         }
-        std::cerr << "\roptimization error = " << s << std::endl;
+        //std::cerr << "\roptimization error = " << s << std::endl;
         const float *values = pso.getBest();
 
         uint cnt = 0;

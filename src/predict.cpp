@@ -8,9 +8,11 @@
 using namespace Predictor;
 
 
-#define WINDOW 500u
+
+#define WINDOW 2000u
 #define NODES  1u
-#define LOOK_AHEAD 333u
+#define LOOK_AHEAD 500u
+
 
 bool loadSequence(std::vector<float> *seq, const char *file)
 {
@@ -91,9 +93,18 @@ int main(int argc, char **argv)
                 mf1 = activations[k];
                 idx1 = k;
             }
-            //std::cerr << vec[k].targetVal << ":" << activations[k] << " ";
+            std::cerr << vec[k].targetVal << ":" << activations[k] << " ";
         }
         std::cerr << "\nSELECTED: " << vec[idx1].targetVal << std::endl;
+        if (idx1 == 4)
+        {
+            std::ostringstream iss;
+            iss << i << ".chart";
+            std::vector<float> wnd;
+            KernelOperation<float, WINDOW, NODES>::normWindow(indata, &wnd, i, 0);
+            dumpSequence(wnd, iss.str().c_str());
+        }
+
         //if (vec[idx1].targetVal != 0.5f)
         {
             outdata[i + WINDOW + LOOK_AHEAD - 1] = prediction[idx1];
