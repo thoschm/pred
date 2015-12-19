@@ -11,16 +11,16 @@ using namespace Predictor;
 
 #define WINDOW 200u
 #define NODES  2u
-#define LOOK_AHEAD 50u
+#define LOOK_AHEAD 200u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.00001f
-#define BREAK_LOOPS 100u
+#define BREAK_LOOPS 10000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN  -2.0f
+#define KRNL_MIN  0.5f
 #define KRNL_MAX  3.0f
-#define KRNL_STEP 0.5f
+#define KRNL_STEP 10.0f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)
@@ -89,7 +89,7 @@ int main(int argc, char **argv)
 
     dumpSequence(indata, "sine.txt");
 
-/*
+
     std::vector<std::pair<uint, float> > targets;
     uint c = 0;
     for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP)
@@ -149,8 +149,8 @@ int main(int argc, char **argv)
             }
         }
     }
-*/
 
+/*
     std::vector<Kernel<float, WINDOW, NODES> > vec;
     // learn kernels
     uint cn = 0;
@@ -171,23 +171,23 @@ int main(int argc, char **argv)
 
         //KernelOperation<float, WINDOW, NODES>::print(krnl);
     }
-
+*/
     // store result
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
     std::cerr << "results stored as kernels.bin\n";
 
-    /*
-    std::vector<float> full;
-    loadSequence(&full, "cma.txt");
+
+    std::vector<float> full = indata;
+    //loadSequence(&full, "cma.txt");
     std::vector<float> resp, errk;
     KernelOperation<float, WINDOW, NODES>::applyKernel(vec[0], full, &resp, &errk, KRNL_MIN, TSIGMA, LOOK_AHEAD);
-    for (uint k = 0; k < resp.size(); ++k)
+    /*for (uint k = 0; k < resp.size(); ++k)
     {
         resp[k] *= 100.0f;
         errk[k] *= 100.0f;
-    }
+    }*/
     dumpSequence(resp, "response.txt");
     dumpSequence(errk, "error.txt");
-*/
+
     return 0;
 }
