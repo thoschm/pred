@@ -9,13 +9,13 @@
 using namespace Predictor;
 
 
-#define WINDOW 200u
-#define NODES  2u
-#define LOOK_AHEAD 200u
+#define WINDOW 1000u
+#define NODES  1u
+#define LOOK_AHEAD 100u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.00001f
-#define BREAK_LOOPS 10000u
+#define BREAK_LOOPS 3000u
 
 #define TSIGMA 10.0f
 #define KRNL_MIN  0.5f
@@ -74,18 +74,18 @@ int main(int argc, char **argv)
 
     // load input sequence
     std::vector<float> indata;
-   /* if (!loadSequence(&indata, argv[1]))
+    if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
-    }*/
+    }
     uint devs = atoi(argv[2]);
 
-
+/*
     for (uint i = 0; i < 3000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
     }
-
+*/
 
     dumpSequence(indata, "sine.txt");
 
@@ -181,11 +181,11 @@ int main(int argc, char **argv)
     //loadSequence(&full, "cma.txt");
     std::vector<float> resp, errk;
     KernelOperation<float, WINDOW, NODES>::applyKernel(vec[0], full, &resp, &errk, KRNL_MIN, TSIGMA, LOOK_AHEAD);
-    /*for (uint k = 0; k < resp.size(); ++k)
+    for (uint k = 0; k < resp.size(); ++k)
     {
         resp[k] *= 100.0f;
         errk[k] *= 100.0f;
-    }*/
+    }
     dumpSequence(resp, "response.txt");
     dumpSequence(errk, "error.txt");
 
