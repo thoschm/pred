@@ -491,8 +491,6 @@ public:
                                   const NumericalType targetValue,
                                   const NumericalType targetSigma,
                                   const uint targetAhead,
-                                  const NumericalType lowerLimit,
-                                  const NumericalType upperLimit,
                                   const uint particleCount,
                                   const NumericalType breakScore,
                                   const uint breakLoops = UINT_MAX)
@@ -505,7 +503,26 @@ public:
         pl.minSigma = 0.00001f;
 
         PSO<NumericalType, Window * Nodes * 3> pso(particleCount, scoreFunc, (const void *)&pl);
-        pso.init(lowerLimit, upperLimit);
+
+        // init particle with limits
+        std::vector<NumericalType> lowerL, upperL;
+        for (uint k = 0; k < Window * Nodes; ++k)
+        {
+            // mu
+            lowerL.push_back((NumericalType)0.0);
+            upperL.push_back((NumericalType)1.0);
+
+            // sigma
+            lowerL.push_back((NumericalType)0.0);
+            upperL.push_back((NumericalType)100.0);
+
+            // scale
+            lowerL.push_back((NumericalType)-1.0);
+            upperL.push_back((NumericalType)1.0);
+        }
+        pso.init(lowerL, upperL);
+
+        // optimize
         NumericalType s;
         uint l = 0;
         while ((s = std::sqrt(pso.step())) > breakScore)
@@ -537,8 +554,6 @@ public:
                              const float targetValue,
                              const float targetSigma,
                              const uint targetAhead,
-                             const float lowerLimit,
-                             const float upperLimit,
                              const uint particleCount,
                              const float breakScore,
                              const uint breakLoops = UINT_MAX,
@@ -555,7 +570,24 @@ public:
                                  data,
                                  useCPU,
                                  deviceID);
-        pso.init(lowerLimit, upperLimit);
+
+        // init particle with limits
+        std::vector<float> lowerL, upperL;
+        for (uint k = 0; k < Window * Nodes; ++k)
+        {
+            // mu
+            lowerL.push_back(0.0f);
+            upperL.push_back(1.0f);
+
+            // sigma
+            lowerL.push_back(0.0f);
+            upperL.push_back(100.0f);
+
+            // scale
+            lowerL.push_back(-1.0f);
+            upperL.push_back(1.0f);
+        }
+        pso.init(lowerL, upperL);
 
         float s;
         uint l = 0;

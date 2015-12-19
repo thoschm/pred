@@ -205,17 +205,23 @@ public:
     }
 
     // init
-    void init(const NumericalType lowerLimit,
-              const NumericalType upperLimit,
+    void init(const std::vector<NumericalType> &lowerLimits,
+              const std::vector<NumericalType> &upperLimits,
               const NumericalType w  = (NumericalType)0.7,
               const NumericalType cp = (NumericalType)1.4,
               const NumericalType cg = (NumericalType)1.4)
     {
+        // check
+        if (lowerLimits.size() != Dim || upperLimits.size() != Dim)
+        {
+            std::cerr << "invalid limit vector!\n";
+            return;
+        }
+
         // params
         mW = w;
         mCP = cp;
         mCG = cg;
-        const NumericalType diff = upperLimit - lowerLimit;
 
         // init particles
         for (uint i = 0; i < mParticleCount; ++i)
@@ -229,9 +235,10 @@ public:
             for (uint d = 0; d < Dim; ++d)
             {
                 // x, v, best
-                par.x[d] = mRnd.uniform() * diff + lowerLimit;
+                const NumericalType diff = upperLimits[d] - lowerLimits[d];
+                par.x[d] = mRnd.uniform() * diff + lowerLimits[d];
                 par.v[d] = mRnd.uniform() * (NumericalType)2.0 * diff - diff;
-                par.best[d] = mRnd.uniform() * diff + lowerLimit;
+                par.best[d] = mRnd.uniform() * diff + lowerLimits[d];
             }
         }
 

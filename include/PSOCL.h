@@ -61,7 +61,7 @@ public:
         assert(sizeof(uint) == sizeof(cl_uint));
 
         // fix rnd
-        //mRnd.setSeed(0x12345678u);
+        mRnd.setSeed(0x12345678u);
 
         // reset best pos and create particles
         memset(mBestPos, 0, Dim * sizeof(float));
@@ -282,18 +282,23 @@ public:
         delete[] mPartScore;
     }
 
-    // init
-    void init(const float lowerLimit,
-              const float upperLimit,
+    void init(const std::vector<float> &lowerLimits,
+              const std::vector<float> &upperLimits,
               const float w  = 0.7f,
               const float cp = 1.4f,
               const float cg = 1.4f)
     {
+        // check
+        if (lowerLimits.size() != Dim || upperLimits.size() != Dim)
+        {
+            std::cerr << "invalid limit vector!\n";
+            return;
+        }
+
         // params
         mW = w;
         mCP = cp;
         mCG = cg;
-        const float diff = upperLimit - lowerLimit;
 
         // init particles
         for (uint i = 0; i < mParticleCount; ++i)
@@ -306,9 +311,10 @@ public:
             {
                 // x, v, best
                 const uint idx = i * Dim + d;
-                mPartX[idx] = mRnd.uniform() * diff + lowerLimit;
+                const float diff = upperLimits[d] - lowerLimits[d];
+                mPartX[idx] = mRnd.uniform() * diff + lowerLimits[d];
                 mPartV[idx] = mRnd.uniform() * 2.0f * diff - diff;
-                mPartBest[idx] = mRnd.uniform() * diff + lowerLimit;
+                mPartBest[idx] = mRnd.uniform() * diff + lowerLimits[d];
             }
         }
 

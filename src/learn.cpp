@@ -9,13 +9,13 @@
 using namespace Predictor;
 
 
-#define WINDOW 2000u
-#define NODES  1u
-#define LOOK_AHEAD 500u
+#define WINDOW 200u
+#define NODES  2u
+#define LOOK_AHEAD 50u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.00001f
-#define BREAK_LOOPS 10000u
+#define BREAK_LOOPS 100u
 
 #define TSIGMA 10.0f
 #define KRNL_MIN  -2.0f
@@ -74,21 +74,22 @@ int main(int argc, char **argv)
 
     // load input sequence
     std::vector<float> indata;
-    if (!loadSequence(&indata, argv[1]))
+   /* if (!loadSequence(&indata, argv[1]))
     {
         return EXIT_FAILURE;
-    }
+    }*/
     uint devs = atoi(argv[2]);
 
-/*
+
     for (uint i = 0; i < 3000u; ++i)
     {
         indata.push_back(std::sin(0.1 * i) + std::sin(0.05 * (i + 17)) * std::cos(0.02 * (i + 23)) + 0.01f * i + 5.0f * std::sin(0.01f * (i + 100)));
-    }*/
+    }
 
 
     dumpSequence(indata, "sine.txt");
 
+/*
     std::vector<std::pair<uint, float> > targets;
     uint c = 0;
     for (float k = KRNL_MIN; k <= KRNL_MAX; k += KRNL_STEP)
@@ -127,7 +128,6 @@ int main(int argc, char **argv)
                                                                        indata, target,
                                                                        TSIGMA,
                                                                        LOOK_AHEAD,
-                                                                       0.0f, 1.0f,
                                                                        PARTICLES,
                                                                        BREAK_ERROR,
                                                                        BREAK_LOOPS,
@@ -149,8 +149,8 @@ int main(int argc, char **argv)
             }
         }
     }
+*/
 
-/*
     std::vector<Kernel<float, WINDOW, NODES> > vec;
     // learn kernels
     uint cn = 0;
@@ -163,7 +163,6 @@ int main(int argc, char **argv)
                                                         indata, k,
                                                         TSIGMA,
                                                         LOOK_AHEAD,
-                                                        0.0f, 1.0f,
                                                         PARTICLES,
                                                         BREAK_ERROR,
                                                         BREAK_LOOPS);
@@ -172,11 +171,12 @@ int main(int argc, char **argv)
 
         //KernelOperation<float, WINDOW, NODES>::print(krnl);
     }
-*/
+
     // store result
     KernelOperation<float, WINDOW, NODES>::storeKernelVector(vec, "kernels.bin");
     std::cerr << "results stored as kernels.bin\n";
 
+    /*
     std::vector<float> full;
     loadSequence(&full, "cma.txt");
     std::vector<float> resp, errk;
@@ -188,6 +188,6 @@ int main(int argc, char **argv)
     }
     dumpSequence(resp, "response.txt");
     dumpSequence(errk, "error.txt");
-
+*/
     return 0;
 }
