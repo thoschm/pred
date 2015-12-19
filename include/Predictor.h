@@ -517,7 +517,7 @@ public:
             upperL.push_back((NumericalType)100.0);
 
             // scale
-            lowerL.push_back((NumericalType)0.0);
+            lowerL.push_back((NumericalType)-1.0);
             upperL.push_back((NumericalType)1.0);
         }
         pso.init(lowerL, upperL);
@@ -584,7 +584,7 @@ public:
             upperL.push_back(100.0f);
 
             // scale
-            lowerL.push_back(0.0f);
+            lowerL.push_back(-1.0f);
             upperL.push_back(1.0f);
         }
         pso.init(lowerL, upperL);
@@ -593,7 +593,7 @@ public:
         uint l = 0;
         while ((s = std::sqrt(pso.step())) > breakScore)
         {
-            std::cerr << "\roptimization error = " << s;
+            //std::cerr << "\roptimization error = " << s;
             if (++l == breakLoops) break;
         }
         //std::cerr << "\roptimization error = " << s << std::endl;

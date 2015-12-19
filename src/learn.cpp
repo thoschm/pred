@@ -9,18 +9,18 @@
 using namespace Predictor;
 
 
-#define WINDOW 1000u
-#define NODES  1u
-#define LOOK_AHEAD 100u
+#define WINDOW 500u
+#define NODES  2u
+#define LOOK_AHEAD 200u
 
 #define PARTICLES 100u
 #define BREAK_ERROR 0.00001f
-#define BREAK_LOOPS 3000u
+#define BREAK_LOOPS 10000u
 
 #define TSIGMA 10.0f
-#define KRNL_MIN  0.5f
+#define KRNL_MIN  -2.0f
 #define KRNL_MAX  3.0f
-#define KRNL_STEP 10.0f
+#define KRNL_STEP 0.2f
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)

@@ -9,9 +9,9 @@ using namespace Predictor;
 
 
 
-#define WINDOW 2000u
-#define NODES  1u
-#define LOOK_AHEAD 500u
+#define WINDOW 500u
+#define NODES  2u
+#define LOOK_AHEAD 200u
 
 
 bool loadSequence(std::vector<float> *seq, const char *file)

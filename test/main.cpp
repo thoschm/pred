@@ -7,7 +7,7 @@ typedef unsigned int uint;
 
 int main(int argc, char **argv)
 {
-    const uint interval = 300u; // seconds
+    const uint interval = 3600u; // seconds
     uint nexttime = 0;
     float lastPrice = 0.0;
     std::ifstream ifs;
